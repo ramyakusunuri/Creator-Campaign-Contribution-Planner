@@ -1,4 +1,4 @@
-// File: C:\Users\ASUS\Downloads\creator-campaign-contribution-planner\creator-campaign-contribution-planner\src\app\page.tsx
+// File: C:\Users\ra1os\OneDrive\Desktop\Creator-Campaign-Contribution-Planner\src\app\page.tsx
 import * as entry from '../../../src/app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

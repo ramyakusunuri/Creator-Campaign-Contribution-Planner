@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C24 Promo & Contribution Command Center | Live Brand Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Header / Nav -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-identity">
+        <div class="logo-mark">C24</div>
+        <div>
+          <h1 class="brand-title">Campaign Contribution Command</h1>
+          <p class="brand-subtitle">Real-Time Promo Attribution & Live Order Ingestion</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="brand-selector-wrap">
+          <label for="brand-select">Brand:</label>
+          <select id="brand-select" class="brand-dropdown">
+            <option value="B1" selected>Demo Apparel (B1)</option>
+            <option value="B2">Demo Apparel Rival (B2)</option>
+          </select>
+        </div>
+
+        <div id="connection-status" class="status-indicator connecting">
+          <span class="status-dot"></span>
+          <span id="connection-text" class="status-label">Connecting Stream...</span>
+        </div>
+
+        <button id="btn-purge-seed" class="btn-ghost" title="Purge synthetic seed data in demo environment">
+          Purge Seed Data
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Feed Status Bar -->
+  <section class="feed-bar">
+    <div class="feed-container">
+      <div class="feed-metric">
+        <span class="feed-metric-label">Website Redemptions:</span>
+        <span id="stat-website-count" class="feed-metric-value text-accent">0</span>
+      </div>
+      <div class="feed-divider"></div>
+      <div class="feed-metric">
+        <span class="feed-metric-label">Synthetic Seed Uses:</span>
+        <span id="stat-seed-count" class="feed-metric-value">0</span>
+      </div>
+      <div class="feed-divider"></div>
+      <div class="feed-metric">
+        <span class="feed-metric-label">Unregistered Code Uses:</span>
+        <span id="stat-unreg-count" class="feed-metric-value text-danger">0</span>
+      </div>
+      <div class="feed-divider"></div>
+      <div class="feed-metric">
+        <span class="feed-metric-label">Last Ingested At (IST):</span>
+        <span id="stat-last-received" class="feed-metric-value text-muted">None</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Unregistered Code Warning Banner -->
+  <div id="unregistered-banner" class="alert-banner alert-warning hidden">
+    <div class="alert-content">
+      <div class="alert-icon">⚠️</div>
+      <div>
+        <strong>Unregistered Promo Codes Detected!</strong>
+        <p>Orders were placed using promo codes that have not yet been registered to any creator. Review below to attribute or audit them.</p>
+      </div>
+    </div>
+    <button id="dismiss-banner-btn" class="btn-text">Dismiss</button>
+  </div>
+
+  <!-- Main Dashboard Grid -->
+  <main class="dashboard-main">
+    
+    <!-- Left Column: Registration + Active Codes -->
+    <div class="col-left">
+      
+      <!-- Promo Registration Card -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">Register Creator Promo Code</h2>
+          <span class="card-tag">Brand Side</span>
+        </div>
+        <p class="card-description">
+          Register a valid code for an eligible creator with validity dates. Discount calculations are owned and reported by the e-commerce website at checkout.
+        </p>
+
+        <form id="promo-registration-form" class="form-grid">
+          <div class="form-group">
+            <label for="input-code">Promo Code *</label>
+            <input type="text" id="input-code" name="code" placeholder="e.g. AARAV10" required maxlength="20" class="input-mono uppercase" />
+            <small class="form-help">4-20 alphanumeric characters, no spaces</small>
+          </div>
+
+          <div class="form-group">
+            <label for="select-creator">Influencer / Creator *</label>
+            <select id="select-creator" name="creator_id" required class="input-select">
+              <option value="" disabled selected>Loading creators...</option>
+            </select>
+            <small id="creator-help" class="form-help">Only conflict-free creators are eligible</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-valid-from">Valid From (IST) *</label>
+              <input type="datetime-local" id="input-valid-from" name="valid_from" required class="input-datetime" />
+            </div>
+            <div class="form-group">
+              <label for="input-valid-to">Valid To (IST) *</label>
+              <input type="datetime-local" id="input-valid-to" name="valid_to" required class="input-datetime" />
+            </div>
+          </div>
+
+          <div id="form-error-msg" class="form-error hidden"></div>
+          <div id="form-success-msg" class="form-success hidden"></div>
+
+          <div class="form-actions">
+            <button type="submit" id="btn-submit-promo" class="btn-primary">
+              Register Promo Code
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Active Promo Codes Table -->
+      <section class="card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Registered Promo Codes</h2>
+            <p class="card-description">Codes stored in persistent SQLite database</p>
+          </div>
+          <button id="btn-refresh-promos" class="btn-sm btn-outline">Refresh</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Creator</th>
+                <th>Validity (IST)</th>
+                <th>Status</th>
+                <th class="text-right">Uses</th>
+                <th class="text-right">Units</th>
+                <th class="text-right">Gross (INR)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="promo-codes-tbody">
+              <tr>
+                <td colspan="8" class="text-center text-muted py-6">Loading registered promo codes...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Right Column: Live Feed & Unregistered Uses -->
+    <div class="col-right">
+
+      <!-- Live Stream Events Card -->
+      <section class="card live-card">
+        <div class="card-header flex-between">
+          <div class="flex-align gap-2">
+            <span class="live-dot animate-pulse"></span>
+            <h2 class="card-title">Live Ingestion Stream</h2>
+          </div>
+          <span class="badge-tag">Stream Reader (fetch)</span>
+        </div>
+        <p class="card-description">
+          Real-time updates delivered over authenticated HTTP streaming.
+        </p>
+
+        <div id="live-events-container" class="live-feed-list">
+          <div class="empty-feed text-center text-muted">
+            <div class="radar-scan"></div>
+            <p>Listening for real-time checkout & registration events...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Unregistered Uses Section -->
+      <section class="card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Unregistered Code Redemptions</h2>
+            <p class="card-description">Reported orders with codes not registered by brand</p>
+          </div>
+          <button id="btn-refresh-unreg" class="btn-sm btn-outline">Refresh</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Code Used</th>
+                <th class="text-right">Units</th>
+                <th>Used At (IST)</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="unregistered-tbody">
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">No unregistered code redemptions recorded</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Edit Dates Modal -->
+  <div id="patch-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Validity Dates: <span id="modal-code-name" class="text-accent"></span></h3>
+        <button id="modal-close-btn" class="btn-icon">&times;</button>
+      </div>
+      <form id="patch-form">
+        <div class="form-group">
+          <label for="patch-valid-from">Valid From (IST)</label>
+          <input type="datetime-local" id="patch-valid-from" class="input-datetime" required />
+        </div>
+        <div class="form-group">
+          <label for="patch-valid-to">Valid To (IST)</label>
+          <input type="datetime-local" id="patch-valid-to" class="input-datetime" required />
+        </div>
+        <div id="modal-error-msg" class="form-error hidden"></div>
+        <div class="modal-footer">
+          <button type="button" id="modal-cancel-btn" class="btn-outline">Cancel</button>
+          <button type="submit" class="btn-primary">Update Dates</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>C24 Creator Campaign Contribution Planner &bull; Node.js Native HTTP & SQLite Engine &bull; Strictly IST (+05:30) Timezone</p>
+      <p class="text-muted">Monetary values in INR. Unknown discounts remain strictly null, never zero.</p>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

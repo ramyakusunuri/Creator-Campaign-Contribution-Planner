@@ -1,24 +1,25 @@
-/* ATELIER 24 Modern Fashion Stylesheet */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap');
+/* ATELIER 24 INDIA - Luxury & Modern Indian Essentials Stylesheet */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: 'Playfair Display', Georgia, serif;
+  --color-gold: #c5a880;
+  --color-gold-hover: #b09164;
+  --color-dark: #0f172a;
 }
 
 body {
-  font-family: var(--font-sans);
-  background-color: #fafafa;
-  color: #0f172a;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-.font-serif {
-  font-family: var(--font-serif);
+/* Glassmorphism Navigation */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -34,48 +35,32 @@ body {
   background: #94a3b8;
 }
 
-/* Drawer slide transition */
-.drawer-enter {
-  transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.drawer-enter-active {
-  transform: translateX(0);
+/* Luxury Gold & Metallic Highlights */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-/* Backdrop blur */
-.glass-nav {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+.gold-border {
+  border-color: #d4af37;
 }
 
-/* Credit Card Realistic Mockup */
-.credit-card-mockup {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #020617 100%);
-  box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  border-radius: 16px;
-  color: #ffffff;
+/* Premium Card & Image Hover Effects */
+.luxury-card {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.credit-card-mockup::before {
-  content: '';
-  position: absolute;
-  top: -40%;
-  right: -20%;
-  width: 250px;
-  height: 250px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
-  pointer-events: none;
+.luxury-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
 
+/* Payment Card Chip Styling */
 .chip {
-  width: 42px;
+  width: 44px;
   height: 32px;
-  background: linear-gradient(135deg, #e6c875 0%, #d4af37 50%, #aa820a 100%);
+  background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
   border-radius: 6px;
   position: relative;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0,0,0,0.2);
@@ -92,21 +77,14 @@ body {
   border-radius: 3px;
 }
 
-<<<<<<< HEAD
 /* Product Card Image Zoom & Gallery Transitions */
 .product-card .img-zoom {
   transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
-=======
-/* Product Card Image Zoom */
-.product-card .img-zoom {
-  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 }
 .product-card:hover .img-zoom {
   transform: scale(1.05);
 }
 
-<<<<<<< HEAD
 /* Quick View Gallery Thumbnail Active Styles */
 .qv-thumb-btn {
   cursor: pointer;
@@ -116,8 +94,6 @@ body {
   transform: translateY(-2px);
 }
 
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -137,8 +113,6 @@ body {
   animation: pulseGlow 2s infinite ease-in-out;
 }
 
-<<<<<<< HEAD
-=======
 /* Checkmark animation for success */
 @keyframes checkmarkStroke {
   100% { stroke-dashoffset: 0; }
@@ -161,7 +135,6 @@ body {
   animation: checkmarkStroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
 }
 
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 /* Print Stylesheet for receipt */
 @media print {
   body * {

@@ -7,3 +7,7 @@ build/
 .env
 .env.*
 !.env.example
+powershell.cmd
+*.db
+*.db-wal
+*.db-shm

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 // ATELIER 24 INDIA - Complete Interactive E-Commerce & Checkout Engine with Multi-Image Gallery
-=======
-// ATELIER 24 INDIA - Complete Interactive E-Commerce & Checkout Engine (INR)
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 
 // Currency Formatter for Indian Rupees
 function formatINR(amount) {
@@ -10,12 +6,9 @@ function formatINR(amount) {
   return '₹' + Math.round(amount).toLocaleString('en-IN');
 }
 
-<<<<<<< HEAD
 // Fallback image helper
 const DEFAULT_FALLBACK_IMG = "assets/images/fallback.jpg";
 
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 // Application State
 const state = {
   products: PRODUCTS,
@@ -30,7 +23,6 @@ const state = {
     {
       id: "cart-init-1",
       productId: 1,
-<<<<<<< HEAD
       title: "Performance Athletic Track Pants",
       price: 1499,
       origPrice: 1999,
@@ -43,28 +35,11 @@ const state = {
     }
   ],
   wishlist: [2, 5, 7],
-=======
-      title: "Structured Double-Breasted Wool Blend Blazer",
-      price: 4999,
-      origPrice: 6499,
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
-      selectedSize: "M",
-      selectedColor: "Oatmeal Camel",
-      colorHex: "#C2A878",
-      quantity: 1
-    }
-  ],
-  wishlist: [2, 5],
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   
   // Promo Engine
   appliedPromo: null,
   promoInput: '',
-<<<<<<< HEAD
   promoMessage: null,
-=======
-  promoMessage: null, // { type: 'success' | 'error', text: '' }
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   
   // Navigation & Views
   currentView: 'catalog', // 'catalog' | 'checkout' | 'confirmation'
@@ -73,11 +48,7 @@ const state = {
   isTrackingModalOpen: false,
   
   // Checkout State
-<<<<<<< HEAD
   checkoutStep: 1, // 1: Delivery, 2: Payment, 3: Review
-=======
-  checkoutStep: 1, // 1: Shipping, 2: Payment, 3: Review
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   shippingMethod: 'standard', // 'standard' (₹149 or free) | 'express' (₹299)
   isProcessingPayment: false,
   processingStepText: 'Verifying UPI / Card payment...',
@@ -121,11 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   
   // Welcome toast
-<<<<<<< HEAD
   showToast("Namaste from ATELIER 24", "Complimentary express delivery across India on orders over ₹1,999!", "info");
-=======
-  showToast("Namaste from ATELIER 24", "Free delivery across India on orders over ₹1,999. Use code FASHION20!", "info");
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 });
 
 // Toast Manager
@@ -151,11 +118,7 @@ function showToast(title, message, type = 'success') {
     iconHtml = `<svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
   }
 
-<<<<<<< HEAD
   toastEl.className = `flex items-start gap-3 p-4 rounded-xl shadow-2xl backdrop-blur-md border ${borderClass} transform translate-y-4 opacity-0 transition-all duration-300 max-w-sm pointer-events-auto z-50`;
-=======
-  toastEl.className = `flex items-start gap-3 p-4 rounded-xl shadow-2xl backdrop-blur-md border ${borderClass} transform translate-y-4 opacity-0 transition-all duration-300 max-w-sm pointer-events-auto`;
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   toastEl.innerHTML = `
     <div class="mt-0.5 shrink-0">${iconHtml}</div>
     <div class="flex-1">
@@ -169,18 +132,10 @@ function showToast(title, message, type = 'success') {
 
   toastContainer.appendChild(toastEl);
   
-<<<<<<< HEAD
-=======
-  // Animate in
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   requestAnimationFrame(() => {
     toastEl.classList.remove('translate-y-4', 'opacity-0');
   });
 
-<<<<<<< HEAD
-=======
-  // Auto dismiss after 3.8s
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   setTimeout(() => {
     dismissToast(id);
   }, 3800);
@@ -202,11 +157,7 @@ function calculateTotals() {
   let baseShipping = state.shippingMethod === 'express' ? 299 : 149;
   let shipping = subtotal > 0 ? baseShipping : 0;
   
-<<<<<<< HEAD
   // Free standard delivery if subtotal >= ₹1,999
-=======
-  // Free standard shipping if subtotal >= ₹1,999
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   let isFreeShippingThreshold = subtotal >= 1999;
   if (isFreeShippingThreshold && state.shippingMethod === 'standard') {
     shipping = 0;
@@ -248,7 +199,7 @@ function calculateTotals() {
 }
 
 // Promo Code Handlers
-function applyPromoCode(codeToApply) {
+async function applyPromoCode(codeToApply) {
   const code = (codeToApply || state.promoInput || '').trim().toUpperCase();
   
   if (!code) {
@@ -258,7 +209,34 @@ function applyPromoCode(codeToApply) {
     return;
   }
 
-  if (VALID_PROMO_CODES[code]) {
+  // First, check with live C24 Promo Service backend (via X-Report-Key)
+  let backendCheck = null;
+  try {
+    const res = await fetch(`http://localhost:3000/brands/B1/promo-codes/${encodeURIComponent(code)}/check`, {
+      headers: { 'X-Report-Key': 'demo-report-key-b1' }
+    });
+    if (res.ok) {
+      backendCheck = await res.json();
+    }
+  } catch (err) {
+    console.warn('Backend promo check unreachable, checking local presets:', err);
+  }
+
+  if (backendCheck && backendCheck.valid) {
+    // Website owns and applies its discount (e.g. 20% campaign discount)
+    state.appliedPromo = {
+      code: code,
+      type: 'percent',
+      value: 20,
+      description: `Official Influencer Campaign Promo (20% Off)`
+    };
+    state.promoInput = code;
+    state.promoMessage = {
+      type: 'success',
+      text: `Code '${code}' is active! 20% discount applied to your cart.`
+    };
+    showToast(`Promo Applied: ${code}`, `20% influencer discount applied!`, 'success');
+  } else if (VALID_PROMO_CODES[code]) {
     state.appliedPromo = VALID_PROMO_CODES[code];
     state.promoInput = code;
     
@@ -271,14 +249,19 @@ function applyPromoCode(codeToApply) {
       type: 'success',
       text: `Code '${code}' applied successfully! ${extraDetail}`
     };
-    
     showToast(`Coupon Applied: ${code}`, extraDetail, 'success');
   } else {
+    const reasonText = backendCheck && backendCheck.reason === 'expired'
+      ? `Promo code '${code}' has expired.`
+      : backendCheck && backendCheck.reason === 'not_yet_valid'
+      ? `Promo code '${code}' is not active yet.`
+      : `Invalid code '${code}'. Try AARAV10, DIYA15, or FASHION20.`;
+
     state.promoMessage = {
       type: 'error',
-      text: `Invalid code '${code}'. Try FASHION20, SAVE10, or FREESHIP.`
+      text: reasonText
     };
-    showToast("Invalid Promo Code", "Try using FASHION20, SAVE10, or FREESHIP", "error");
+    showToast("Invalid Promo Code", reasonText, "error");
   }
 
   renderCartDrawer();
@@ -374,10 +357,7 @@ function addToCart(productId, customSize, customColor, customColorHex, quantity 
       price: product.price,
       origPrice: product.origPrice,
       image: product.image,
-<<<<<<< HEAD
       fallbackUrl: product.fallbackUrl,
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       selectedSize: size,
       selectedColor: color,
       colorHex: colorHex,
@@ -416,10 +396,7 @@ function buyNow(productId, customSize, customColor, customColorHex) {
       price: product.price,
       origPrice: product.origPrice,
       image: product.image,
-<<<<<<< HEAD
       fallbackUrl: product.fallbackUrl,
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       selectedSize: size,
       selectedColor: color,
       colorHex: colorHex,
@@ -498,7 +475,6 @@ function setupEventListeners() {
 function setCategory(category) {
   state.activeCategory = category;
   applyFilters();
-<<<<<<< HEAD
   updateCategoryPillsUI();
 }
 
@@ -512,8 +488,6 @@ function updateCategoryPillsUI() {
       btn.className = "category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400";
     }
   });
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 }
 
 function setPriceFilter(filter) {
@@ -530,13 +504,7 @@ function applyFilters() {
   let list = [...state.products];
 
   // Category filter
-<<<<<<< HEAD
   if (state.activeCategory !== 'all') {
-=======
-  if (state.activeCategory === 'sale') {
-    list = list.filter(p => p.origPrice !== null);
-  } else if (state.activeCategory !== 'all') {
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
     list = list.filter(p => p.category === state.activeCategory);
   }
 
@@ -550,21 +518,12 @@ function applyFilters() {
   }
 
   // Price range (INR)
-<<<<<<< HEAD
   if (state.priceFilter === 'under-1000') {
     list = list.filter(p => p.price < 1000);
   } else if (state.priceFilter === '1000-1300') {
     list = list.filter(p => p.price >= 1000 && p.price <= 1300);
   } else if (state.priceFilter === 'above-1300') {
     list = list.filter(p => p.price > 1300);
-=======
-  if (state.priceFilter === 'under-2500') {
-    list = list.filter(p => p.price < 2500);
-  } else if (state.priceFilter === '2500-4500') {
-    list = list.filter(p => p.price >= 2500 && p.price <= 4500);
-  } else if (state.priceFilter === '4500-plus') {
-    list = list.filter(p => p.price > 4500);
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
   }
 
   // Sorting
@@ -592,11 +551,7 @@ function renderNavbar() {
   }
 }
 
-<<<<<<< HEAD
 // Render Catalog Grid with High-Quality Cards & Image Transitions
-=======
-// Render Catalog Grid
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 function renderCatalog() {
   const container = document.getElementById('productsGrid');
   const countEl = document.getElementById('productsCount');
@@ -620,7 +575,6 @@ function renderCatalog() {
     const isWishlisted = state.wishlist.includes(p.id);
     const hasDiscount = p.origPrice !== null;
     const discountPercent = hasDiscount ? Math.round(((p.origPrice - p.price) / p.origPrice) * 100) : 0;
-<<<<<<< HEAD
     const secondaryImage = p.images && p.images[1] ? p.images[1] : p.image;
 
     return `
@@ -648,22 +602,6 @@ function renderCatalog() {
 
           <!-- Live Badges -->
           <div class="absolute top-3 left-3 flex flex-col gap-1.5 z-10 pointer-events-none">
-=======
-
-    return `
-      <div class="product-card group relative flex flex-col bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
-        <!-- Image Container with Alive Hover Zoom & Shimmer -->
-        <div class="relative w-full aspect-[3/4] bg-slate-100 overflow-hidden cursor-pointer" onclick="openQuickView(${p.id})">
-          <img 
-            src="${p.image}" 
-            alt="${p.title}" 
-            class="img-zoom w-full h-full object-cover object-top"
-            loading="lazy"
-          />
-
-          <!-- Live Badges -->
-          <div class="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
             ${p.badge ? `<span class="px-2.5 py-1 text-[11px] font-semibold tracking-wider uppercase rounded-full shadow-sm ${p.badgeColor}">${p.badge}</span>` : ''}
             ${hasDiscount ? `<span class="px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase rounded-full shadow-sm bg-rose-600 text-white">-${discountPercent}%</span>` : ''}
           </div>
@@ -686,11 +624,7 @@ function renderCatalog() {
               class="w-full py-2.5 px-4 bg-white/95 backdrop-blur text-slate-900 rounded-xl text-xs font-semibold tracking-wide uppercase shadow-lg hover:bg-white transition flex items-center justify-center gap-1.5"
             >
               <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-<<<<<<< HEAD
               Quick Preview & Angles
-=======
-              Quick Preview
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
             </button>
           </div>
         </div>
@@ -753,21 +687,14 @@ function renderCatalog() {
   }).join('');
 }
 
-<<<<<<< HEAD
 // Quick View Modal & Multi-Image Gallery
-=======
-// Quick View Modal
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 function openQuickView(productId) {
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
 
   state.quickViewProduct = {
     ...product,
-<<<<<<< HEAD
     activeImage: product.image,
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
     selectedSize: product.sizes[0],
     selectedColor: product.colors[0].name,
     selectedColorHex: product.colors[0].hex,
@@ -793,7 +720,6 @@ function closeQuickView() {
   }
 }
 
-<<<<<<< HEAD
 function setQuickViewActiveImage(imgSrc) {
   if (state.quickViewProduct) {
     state.quickViewProduct.activeImage = imgSrc;
@@ -819,14 +745,11 @@ function setQuickViewActiveImage(imgSrc) {
   }
 }
 
-=======
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 function renderQuickViewModal() {
   const qv = state.quickViewProduct;
   const container = document.getElementById('quickViewContent');
   if (!qv || !container) return;
 
-<<<<<<< HEAD
   const imagesList = qv.images && qv.images.length > 0 ? qv.images : [qv.image];
 
   container.innerHTML = `
@@ -860,15 +783,6 @@ function renderQuickViewModal() {
               <img src="${img}" alt="Angle ${idx + 1}" class="w-full h-full object-cover object-top" onerror="this.onerror=null; this.src='${DEFAULT_FALLBACK_IMG}';" />
             </button>
           `).join('')}
-=======
-  container.innerHTML = `
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-      <!-- Gallery Column -->
-      <div class="relative aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden">
-        <img src="${qv.image}" alt="${qv.title}" class="w-full h-full object-cover object-top" />
-        <div class="absolute top-3 left-3">
-          ${qv.badge ? `<span class="px-3 py-1 text-xs font-semibold rounded-full ${qv.badgeColor}">${qv.badge}</span>` : ''}
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         </div>
       </div>
 
@@ -1022,16 +936,12 @@ function renderCartDrawer() {
   // Render items
   container.innerHTML = state.cart.map(item => `
     <div class="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 relative group">
-<<<<<<< HEAD
       <img 
         src="${item.image}" 
         alt="${item.title}" 
         class="w-20 h-24 object-cover object-top rounded-xl bg-white shrink-0 border border-slate-200" 
         onerror="this.onerror=null; this.src='${item.fallbackUrl || DEFAULT_FALLBACK_IMG}';"
       />
-=======
-      <img src="${item.image}" alt="${item.title}" class="w-20 h-24 object-cover object-top rounded-xl bg-white shrink-0" />
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       <div class="flex-1 flex flex-col justify-between">
         <div>
           <div class="flex items-start justify-between gap-2">
@@ -1051,19 +961,11 @@ function renderCartDrawer() {
         </div>
 
         <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60">
-<<<<<<< HEAD
-=======
-          <!-- Stepper -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
           <div class="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden">
             <button onclick="updateCartQuantity('${item.id}', -1)" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 text-xs font-bold transition">−</button>
             <span class="px-3 py-1 text-xs font-semibold text-slate-900">${item.quantity}</span>
             <button onclick="updateCartQuantity('${item.id}', 1)" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 text-xs font-bold transition">+</button>
           </div>
-<<<<<<< HEAD
-=======
-          <!-- Price -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
           <span class="text-sm font-bold text-slate-900">${formatINR(item.price * item.quantity)}</span>
         </div>
       </div>
@@ -1079,11 +981,7 @@ function renderCartDrawer() {
   // Render Promo Section & Order Totals
   if (summaryContainer) {
     summaryContainer.innerHTML = `
-<<<<<<< HEAD
       <!-- Free Shipping Tracker -->
-=======
-      <!-- Free Shipping Tracker across India -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       <div class="p-3.5 bg-slate-100 rounded-xl mb-4 border border-slate-200">
         <div class="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
           <span class="flex items-center gap-1.5">
@@ -1107,10 +1005,6 @@ function renderCartDrawer() {
           <span class="text-[11px] text-slate-400 font-normal">Active mock coupons</span>
         </label>
 
-<<<<<<< HEAD
-=======
-        <!-- Input & Apply Button -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         <div class="flex gap-2">
           <div class="relative flex-1">
             <input 
@@ -1268,25 +1162,17 @@ function renderCheckout() {
             <span class="text-xs text-slate-500 font-medium">${state.cart.reduce((s, i) => s + i.quantity, 0)} items</span>
           </div>
 
-<<<<<<< HEAD
           <!-- Items Mini List with Fallback -->
-=======
-          <!-- Items Mini List -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
           <div class="space-y-3.5 max-h-60 overflow-y-auto pr-1 mb-5">
             ${state.cart.map(item => `
               <div class="flex items-center gap-3">
                 <div class="relative shrink-0">
-<<<<<<< HEAD
                   <img 
                     src="${item.image}" 
                     alt="${item.title}" 
                     class="w-14 h-16 object-cover object-top rounded-xl bg-slate-100 border border-slate-200" 
                     onerror="this.onerror=null; this.src='${item.fallbackUrl || DEFAULT_FALLBACK_IMG}';"
                   />
-=======
-                  <img src="${item.image}" alt="${item.title}" class="w-14 h-16 object-cover object-top rounded-xl bg-slate-100" />
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
                   <span class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">${item.quantity}</span>
                 </div>
                 <div class="flex-1 min-w-0">
@@ -1541,11 +1427,7 @@ function renderShippingStep() {
                   class="text-slate-900 focus:ring-slate-900"
                 />
                 <div>
-<<<<<<< HEAD
                   <div class="text-sm font-semibold text-slate-900">Standard Air Express (3–5 Days)</div>
-=======
-                  <div class="text-sm font-semibold text-slate-900">Standard Delivery (3–5 Days)</div>
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
                   <div class="text-xs text-slate-500">Tracked air-express via BlueDart / Delhivery</div>
                 </div>
               </div>
@@ -1579,10 +1461,6 @@ function renderShippingStep() {
           </div>
         </div>
 
-<<<<<<< HEAD
-=======
-        <!-- Submit Button -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         <div class="pt-6">
           <button 
             type="submit" 
@@ -1861,10 +1739,6 @@ function renderPaymentStep() {
         </div>
       ` : ''}
 
-<<<<<<< HEAD
-=======
-      <!-- Buttons navigation -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       <div class="pt-4 grid grid-cols-2 gap-3">
         <button 
           type="button" 
@@ -1992,10 +1866,6 @@ function renderReviewStep(totals) {
         <p class="text-xs text-slate-500 mt-0.5">Please review your delivery and payment details</p>
       </div>
 
-<<<<<<< HEAD
-=======
-      <!-- Recaps Grid -->
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <!-- Shipping Summary -->
         <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200">
@@ -2117,6 +1987,50 @@ function executePlaceOrder() {
       appliedPromo: state.appliedPromo ? { ...state.appliedPromo } : null
     };
 
+    // Report redemption to C24 Promo Tracking Service (backend integration)
+    if (state.appliedPromo) {
+      const promoCode = state.appliedPromo.code;
+      const cleanOrderId = mockOrderId.replace('#', '');
+      const pseudoCustomerId = 'CUST-' + Math.floor(1000 + Math.random() * 9000);
+      const nowIso = new Date().toISOString();
+      const subtotalVal = totals.subtotal || 1;
+      const discountVal = totals.discount || 0;
+
+      const reportPayload = {
+        order_id: cleanOrderId,
+        customer_id: pseudoCustomerId,
+        used_at: nowIso,
+        payment_confirmed_at: nowIso,
+        discount_inr: discountVal,
+        items: state.cart.map((it, idx) => {
+          const lineGross = it.price * it.quantity;
+          const lineDisc = idx === state.cart.length - 1
+            ? Math.max(0, Math.round((discountVal - Math.floor((discountVal * (subtotalVal - lineGross)) / subtotalVal)) * 100) / 100)
+            : Math.round(((discountVal * lineGross) / subtotalVal) * 100) / 100;
+          return {
+            product_id: 'PRD-' + it.productId,
+            name: it.title,
+            unit_price_inr: it.price,
+            quantity: it.quantity,
+            line_discount_inr: lineDisc
+          };
+        })
+      };
+
+      fetch(`http://localhost:3000/brands/B1/promo-codes/${encodeURIComponent(promoCode)}/redemptions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Report-Key': 'demo-report-key-b1'
+        },
+        body: JSON.stringify(reportPayload)
+      }).then(r => r.json()).then(data => {
+        console.log('[C24 Promo Sync] Order reported to Brand Command:', data);
+      }).catch(err => {
+        console.warn('[C24 Promo Sync] Failed to report to promo service:', err);
+      });
+    }
+
     // Reset Cart & State
     state.cart = [];
     state.appliedPromo = null;
@@ -2224,16 +2138,12 @@ function renderConfirmation() {
           ${order.items.map(item => `
             <div class="flex items-center justify-between gap-4">
               <div class="flex items-center gap-3">
-<<<<<<< HEAD
                 <img 
                   src="${item.image}" 
                   alt="${item.title}" 
                   class="w-14 h-16 object-cover object-top rounded-xl bg-slate-100 border border-slate-200 shrink-0" 
                   onerror="this.onerror=null; this.src='${item.fallbackUrl || DEFAULT_FALLBACK_IMG}';"
                 />
-=======
-                <img src="${item.image}" alt="${item.title}" class="w-14 h-16 object-cover object-top rounded-xl bg-slate-100 shrink-0" />
->>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
                 <div>
                   <h4 class="text-sm font-semibold text-slate-900">${item.title}</h4>
                   <p class="text-xs text-slate-500 mt-0.5">${item.selectedColor} • Size: ${item.selectedSize} • Qty: ${item.quantity}</p>

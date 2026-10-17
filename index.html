@@ -55,12 +55,25 @@
         </a>
 
         <!-- Desktop Category Links -->
+<<<<<<< HEAD
         <nav class="hidden lg:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-slate-600">
           <button onclick="setCategory('all'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">All Pieces</button>
           <button onclick="setCategory('fitness'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Fitness Wear</button>
           <button onclick="setCategory('casual'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Casual Wear</button>
           <button onclick="setCategory('night'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Night Wear</button>
           <button onclick="setCategory('party'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Party Wear</button>
+=======
+        <nav class="hidden lg:flex items-center gap-7 text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <button onclick="setCategory('all'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">All Pieces</button>
+          <button onclick="setCategory('women'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Women</button>
+          <button onclick="setCategory('men'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Men</button>
+          <button onclick="setCategory('footwear'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Footwear</button>
+          <button onclick="setCategory('accessories'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Bags & Accessories</button>
+          <button onclick="setCategory('sale'); navigateTo('catalog')" class="text-rose-600 hover:text-rose-700 transition py-2 flex items-center gap-1 font-bold">
+            Festive Sale
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+          </button>
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         </nav>
       </div>
 
@@ -69,7 +82,11 @@
         <input 
           type="text" 
           id="catalogSearchInput" 
+<<<<<<< HEAD
           placeholder="Search track pants, sports t-shirt, casual jeans, night suit, party dress..." 
+=======
+          placeholder="Search blazers, kurtas, boots, dresses..." 
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
           class="w-full pl-9 pr-4 py-2 bg-slate-100/90 text-xs text-slate-900 placeholder:text-slate-400 rounded-full border border-transparent focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 transition"
         />
         <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,12 +133,22 @@
     </div>
 
     <!-- Mobile Navigation Sub-bar -->
+<<<<<<< HEAD
     <div class="lg:hidden flex items-center justify-around py-2 px-4 border-t border-slate-200/60 bg-white/60 text-[11px] font-semibold uppercase tracking-wider text-slate-600 overflow-x-auto">
       <button onclick="setCategory('all'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">All</button>
       <button onclick="setCategory('fitness'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Fitness</button>
       <button onclick="setCategory('casual'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Casual</button>
       <button onclick="setCategory('night'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Night Wear</button>
       <button onclick="setCategory('party'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Party Wear</button>
+=======
+    <div class="lg:hidden flex items-center justify-around py-2 px-4 border-t border-slate-200/60 bg-white/60 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+      <button onclick="setCategory('all'); navigateTo('catalog')" class="hover:text-slate-900">All</button>
+      <button onclick="setCategory('women'); navigateTo('catalog')" class="hover:text-slate-900">Women</button>
+      <button onclick="setCategory('men'); navigateTo('catalog')" class="hover:text-slate-900">Men</button>
+      <button onclick="setCategory('footwear'); navigateTo('catalog')" class="hover:text-slate-900">Shoes</button>
+      <button onclick="setCategory('accessories'); navigateTo('catalog')" class="hover:text-slate-900">Bags</button>
+      <button onclick="setCategory('sale'); navigateTo('catalog')" class="text-rose-600 font-bold">Sale</button>
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
     </div>
   </header>
 
@@ -133,6 +160,7 @@
          ========================================== -->
     <div id="catalogView" class="animate-fade-in">
       
+<<<<<<< HEAD
       <!-- Editorial Hero Banner with High-Resolution Photography -->
       <section class="relative rounded-3xl overflow-hidden mb-10 shadow-2xl bg-slate-950 text-white min-h-[380px] flex items-center">
         <!-- Background Photography with Elegant Dark Vignette -->
@@ -165,6 +193,36 @@
             </button>
           </div>
         </div>
+=======
+      <!-- Editorial Hero Banner (Alive Model Lookbook) -->
+      <section class="relative rounded-3xl overflow-hidden mb-10 bg-gradient-to-r from-slate-950 via-slate-900 to-stone-900 text-white p-8 sm:p-12 lg:p-16 shadow-2xl">
+        <div class="relative z-10 max-w-2xl">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-xs font-semibold tracking-wider uppercase text-amber-300 mb-4">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            New Spring / Festive 2026 Collection
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-serif font-bold tracking-tight leading-tight mb-4">
+            Effortless contemporary tailoring & luxury fashion.
+          </h1>
+          <p class="text-sm sm:text-base text-slate-300 leading-relaxed mb-6 font-light">
+            Designed for urban elegance across Mumbai, Delhi, Bengaluru, and beyond. Explore pure mulberry silk dresses, Italian nappa sneakers, and relaxed French linen resort wear.
+          </p>
+          <div class="flex flex-wrap items-center gap-3">
+            <button onclick="setCategory('women')" class="px-5 py-2.5 bg-white text-slate-950 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-slate-100 transition shadow">
+              Shop Women's
+            </button>
+            <button onclick="setCategory('men')" class="px-5 py-2.5 bg-slate-800/80 border border-slate-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-slate-800 transition">
+              Shop Men's
+            </button>
+            <button onclick="setCategory('sale')" class="px-5 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-rose-700 transition">
+              Explore Sale Offers
+            </button>
+          </div>
+        </div>
+
+        <!-- Ambient Glow -->
+        <div class="absolute right-0 bottom-0 top-0 w-1/2 opacity-25 pointer-events-none hidden lg:block bg-gradient-to-l from-amber-400/20 to-transparent"></div>
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
       </section>
 
       <!-- Promo Code Engine Interactive Bar (INR Region) -->
@@ -219,17 +277,31 @@
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
         
         <!-- Category Filter Tabs -->
+<<<<<<< HEAD
         <div class="flex flex-wrap items-center gap-2" id="categoryFilterContainer">
           <button onclick="setCategory('all')" data-cat="all" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-slate-900 text-white shadow-sm">All Pieces</button>
           <button onclick="setCategory('fitness')" data-cat="fitness" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Fitness Wear</button>
           <button onclick="setCategory('casual')" data-cat="casual" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Casual Wear</button>
           <button onclick="setCategory('night')" data-cat="night" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Night Wear</button>
           <button onclick="setCategory('party')" data-cat="party" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Party Wear</button>
+=======
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="setCategory('all')" class="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${state.activeCategory === 'all' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'}">All Pieces</button>
+          <button onclick="setCategory('women')" class="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${state.activeCategory === 'women' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'}">Women</button>
+          <button onclick="setCategory('men')" class="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${state.activeCategory === 'men' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'}">Men</button>
+          <button onclick="setCategory('footwear')" class="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${state.activeCategory === 'footwear' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'}">Footwear</button>
+          <button onclick="setCategory('accessories')" class="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${state.activeCategory === 'accessories' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'}">Bags & Accessories</button>
+          <button onclick="setCategory('sale')" class="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${state.activeCategory === 'sale' ? 'bg-rose-600 text-white' : 'bg-white border border-rose-200 text-rose-700 hover:bg-rose-50'}">Festive Sale</button>
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         </div>
 
         <!-- Right Side: Count, Price Filter (INR) & Sort Dropdown -->
         <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+<<<<<<< HEAD
           <span id="productsCount" class="text-xs text-slate-500 font-medium hidden sm:inline">8 items found</span>
+=======
+          <span id="productsCount" class="text-xs text-slate-500 font-medium hidden sm:inline">12 items found</span>
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
 
           <div class="flex items-center gap-2">
             <!-- Price Range Filter in INR -->
@@ -239,9 +311,15 @@
               class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:ring-2 focus:ring-slate-900 focus:outline-none"
             >
               <option value="all">All Prices</option>
+<<<<<<< HEAD
               <option value="under-1000">Under ₹1,000</option>
               <option value="1000-1300">₹1,000 – ₹1,300</option>
               <option value="above-1300">Above ₹1,300</option>
+=======
+              <option value="under-2500">Under ₹2,500</option>
+              <option value="2500-4500">₹2,500 – ₹4,500</option>
+              <option value="4500-plus">₹4,500 & Above</option>
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
             </select>
 
             <!-- Sort By Selector -->
@@ -361,19 +439,31 @@
   </aside>
 
   <!-- ==========================================
+<<<<<<< HEAD
        QUICK VIEW & MULTI-IMAGE GALLERY MODAL
+=======
+       QUICK VIEW MODAL
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
        ========================================== -->
   <div id="quickViewModal" class="fixed inset-0 z-50 overflow-y-auto hidden opacity-0 transition-opacity duration-200">
     <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onclick="closeQuickView()"></div>
     
     <div class="relative min-h-screen flex items-center justify-center p-4">
+<<<<<<< HEAD
       <div class="relative bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10">
+=======
+      <div class="relative bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10">
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         <button onclick="closeQuickView()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
 
         <div id="quickViewContent">
+<<<<<<< HEAD
           <!-- Rendered dynamically with thumbnail switching -->
+=======
+          <!-- Rendered dynamically -->
+>>>>>>> 02d1a97168d2b2e17ce9334821464c3c161ca305
         </div>
       </div>
     </div>

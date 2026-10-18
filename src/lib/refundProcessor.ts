@@ -26,7 +26,10 @@ export function processRefund(input: RefundInput): {
     throw { status: 400, message: 'Field "amount_inr" must be a finite number > 0.' };
   }
 
-  validateMoneyDecimals({ amount_inr }, ['amount_inr']);
+  const decimalRes = validateMoneyDecimals({ amount_inr });
+  if (!decimalRes.valid) {
+    throw { status: 400, message: decimalRes.error };
+  }
 
   const db = getDb();
 

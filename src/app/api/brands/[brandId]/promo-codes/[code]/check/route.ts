@@ -25,22 +25,20 @@ export async function GET(
     return NextResponse.json({
       code: cleanCode,
       valid: false,
-      reason: 'not_found'
+      reason: 'not_found',
+      status: 'unknown',
+      valid_from: null,
+      valid_to: null
     });
   }
 
   const status = derivePromoStatus(promo.valid_from, promo.valid_to);
-  if (status === 'valid') {
-    return NextResponse.json({
-      code: cleanCode,
-      valid: true,
-      reason: 'valid'
-    });
-  }
-
   return NextResponse.json({
     code: cleanCode,
-    valid: false,
-    reason: status
+    valid: status === 'valid',
+    reason: status,
+    status,
+    valid_from: promo.valid_from,
+    valid_to: promo.valid_to
   });
 }

@@ -15,6 +15,11 @@ export async function POST(
     return auth.response;
   }
 
+  const contentLength = req.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > 1024 * 1024) {
+    return NextResponse.json({ error: 'Payload Too Large, maximum 1MB' }, { status: 413 });
+  }
+
   let body: any;
   try {
     body = await req.json();
@@ -53,6 +58,10 @@ export async function POST(
 
   try {
     const result = validateAndIngestOrder(brandId, body, cleanCode);
+
+    if ('duplicate' in result || !('items' in result)) {
+      return NextResponse.json(result, { status: 200 });
+    }
 
     const eventName = result.registered ? 'use_recorded' : 'unregistered_use_recorded';
     const eventPayload = {
@@ -98,7 +107,7 @@ export async function GET(
 
   const orders = db
     .prepare(`
-      SELECT id, order_id, customer_id, used_at, subtotal_inr, discount_inr, discount_basis, total_inr, status, validity_flag
+      SELECT id, order_id, customer_id, used_at, subtotal_inr, discount_inr, discount_basis, total_inr, status, validity_flag, source
       FROM orders
       WHERE brand_id = ? AND promo_code = ?
       ORDER BY used_at DESC;

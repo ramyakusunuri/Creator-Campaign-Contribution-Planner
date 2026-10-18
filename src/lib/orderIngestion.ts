@@ -1,6 +1,6 @@
 import { getDb } from './db.ts';
 import { round2 } from './calculator.ts';
-import { parseAndValidateIsoDate, ISO_WITH_TZ_REGEX } from './promoLogic.ts';
+import { parseAndValidateIsoDate, ISO_WITH_TZ_REGEX, canonicalHash } from './promoLogic.ts';
 import { validateMoneyDecimals, toPaise } from './moneyValidation.ts';
 import type { LineItemRecord, OrderStatus, ValidityFlag } from '../types/ecommerce.ts';
 
@@ -21,11 +21,19 @@ export interface IngestOrderResult {
   items: LineItemRecord[];
 }
 
+export interface IngestionOptions {
+  source?: 'website' | 'webhook' | 'sync' | 'manual';
+  saveUnregisteredToSeparateTable?: boolean;
+  allowIdempotentDuplicates?: boolean;
+  requirePaymentConfirmed?: boolean;
+}
+
 export function validateAndIngestOrder(
   brandId: string,
   rawPayload: Record<string, any>,
-  forcedPromoCode?: string | null
-): IngestOrderResult {
+  forcedPromoCode?: string | null,
+  options?: IngestionOptions
+): IngestOrderResult | { duplicate: true; order_id: string; registered?: boolean } {
   if (typeof rawPayload !== 'object' || rawPayload === null || Array.isArray(rawPayload)) {
     throw { status: 400, message: 'Payload must be a JSON object.' };
   }
@@ -67,6 +75,18 @@ export function validateAndIngestOrder(
     throw { status: 400, message: err.message };
   }
   const usedAtIso = usedAtDate.toISOString();
+
+  let paymentConfirmedAtIso: string | null = null;
+  if (rawPayload.payment_confirmed_at !== undefined && rawPayload.payment_confirmed_at !== null) {
+    try {
+      const parsedConfirm = parseAndValidateIsoDate('payment_confirmed_at', rawPayload.payment_confirmed_at);
+      paymentConfirmedAtIso = parsedConfirm.toISOString();
+    } catch (err: any) {
+      throw { status: 400, message: err.message };
+    }
+  } else if (options?.requirePaymentConfirmed) {
+    throw { status: 400, message: 'Field "payment_confirmed_at" is required and cannot be null or undefined.' };
+  }
 
   if (!Array.isArray(rawPayload.items) || rawPayload.items.length === 0) {
     throw { status: 400, message: 'Field "items" must be a non-empty array.' };
@@ -213,12 +233,43 @@ export function validateAndIngestOrder(
 
   const db = getDb();
 
-  // Check unique order_id per brand
-  const existingOrder = db
-    .prepare('SELECT id FROM orders WHERE brand_id = ? AND order_id = ?;')
-    .get(brandId, orderId);
-  if (existingOrder) {
-    throw { status: 409, message: `Order "${orderId}" has already been processed for brand "${brandId}".` };
+  // Check unique order_id / idempotency
+  const existingInOrders = db
+    .prepare('SELECT id, order_id, raw_payload FROM orders WHERE brand_id = ? AND order_id = ?;')
+    .get(brandId, orderId) as { id: number; order_id: string; raw_payload: string | null } | undefined;
+
+  const existingInUnreg = db
+    .prepare('SELECT id, order_id, raw_payload FROM unregistered_code_uses WHERE brand_id = ? AND order_id = ?;')
+    .get(brandId, orderId) as { id: number; order_id: string; raw_payload: string | null } | undefined;
+
+  const existing = existingInOrders || existingInUnreg;
+
+  if (existing) {
+    if (options?.allowIdempotentDuplicates) {
+      const incomingHash = canonicalHash(rawPayload);
+      let existingHash = '';
+      try {
+        existingHash = canonicalHash(JSON.parse(existing.raw_payload || '{}'));
+      } catch {}
+
+      if (incomingHash === existingHash) {
+        return {
+          duplicate: true,
+          order_id: orderId,
+          registered: !existingInUnreg
+        };
+      } else {
+        throw {
+          status: 409,
+          message: `Conflict: Order "${orderId}" has already been processed with different payload.`
+        };
+      }
+    } else {
+      throw {
+        status: 409,
+        message: `Order "${orderId}" has already been processed for brand "${brandId}".`
+      };
+    }
   }
 
   let isRegistered = false;
@@ -249,69 +300,122 @@ export function validateAndIngestOrder(
   const discountPaise = finalOrderDiscount !== null ? toPaise(finalOrderDiscount, 'discount') : null;
   const totalPaise = finalTotal !== null ? toPaise(finalTotal, 'total') : null;
 
-  // Insert into database atomically
-  const insertOrder = db.prepare(`
-    INSERT INTO orders (
-      brand_id, order_id, promo_code, customer_id, used_at,
-      subtotal_inr, subtotal_paise,
-      discount_inr, discount_paise,
-      discount_basis,
-      total_inr, total_paise,
-      status, validity_flag, raw_payload
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-  `);
+  // Manage transaction atomically
+  const inTxRow = db.prepare('PRAGMA in_transaction;').get() as { in_transaction: number } | undefined;
+  const shouldManageTx = !inTxRow || inTxRow.in_transaction === 0;
 
-  const orderResult = insertOrder.run(
-    brandId,
-    orderId,
-    normalizedCode,
-    customerId,
-    usedAtIso,
-    subtotal,
-    subtotalPaise,
-    finalOrderDiscount,
-    discountPaise,
-    finalBasis,
-    finalTotal,
-    totalPaise,
-    'completed',
-    validityFlag,
-    JSON.stringify(rawPayload)
-  );
+  if (shouldManageTx) {
+    db.exec('BEGIN IMMEDIATE TRANSACTION;');
+  }
 
-  const orderRowId = Number(orderResult.lastInsertRowid);
+  try {
+    if (options?.saveUnregisteredToSeparateTable && !isRegistered) {
+      // Save unregistered code uses to separate audit table
+      db.prepare(`
+        INSERT INTO unregistered_code_uses (
+          brand_id, order_id, code_entered, customer_id,
+          subtotal_inr, subtotal_paise,
+          discount_inr, discount_paise,
+          total_inr, total_paise,
+          used_at, payment_confirmed_at,
+          raw_payload, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `).run(
+        brandId,
+        orderId,
+        normalizedCode || '',
+        customerId,
+        subtotal,
+        subtotalPaise,
+        finalOrderDiscount,
+        discountPaise,
+        finalTotal,
+        totalPaise,
+        usedAtIso,
+        paymentConfirmedAtIso,
+        JSON.stringify(rawPayload),
+        new Date().toISOString()
+      );
+    } else {
+      // Insert into orders
+      const insertOrder = db.prepare(`
+        INSERT INTO orders (
+          brand_id, order_id, promo_code, customer_id, used_at,
+          payment_confirmed_at, source,
+          subtotal_inr, subtotal_paise,
+          discount_inr, discount_paise,
+          discount_basis,
+          total_inr, total_paise,
+          status, validity_flag, raw_payload
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `);
 
-  const insertItem = db.prepare(`
-    INSERT INTO order_items (
-      order_id_ref, product_id, name,
-      unit_price_inr, unit_price_paise,
-      quantity,
-      gross_inr, gross_paise,
-      line_discount_inr, line_discount_paise,
-      net_inr, net_paise
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-  `);
+      const orderResult = insertOrder.run(
+        brandId,
+        orderId,
+        normalizedCode,
+        customerId,
+        usedAtIso,
+        paymentConfirmedAtIso,
+        options?.source || 'website',
+        subtotal,
+        subtotalPaise,
+        finalOrderDiscount,
+        discountPaise,
+        finalBasis,
+        finalTotal,
+        totalPaise,
+        'completed',
+        validityFlag,
+        JSON.stringify(rawPayload)
+      );
 
-  for (const item of processedItems) {
-    const unitPricePaise = toPaise(item.unit_price_inr, 'unit_price');
-    const grossPaise = toPaise(item.gross_inr, 'gross');
-    const lineDiscountPaise = item.line_discount_inr !== null ? toPaise(item.line_discount_inr, 'line_discount') : null;
-    const netPaise = item.net_inr !== null ? toPaise(item.net_inr, 'net') : null;
+      const orderRowId = Number(orderResult.lastInsertRowid);
 
-    insertItem.run(
-      orderRowId,
-      item.product_id,
-      item.name,
-      item.unit_price_inr,
-      unitPricePaise,
-      item.quantity,
-      item.gross_inr,
-      grossPaise,
-      item.line_discount_inr,
-      lineDiscountPaise,
-      item.net_inr,
-      netPaise
-    );
+      const insertItem = db.prepare(`
+        INSERT INTO order_items (
+          order_id_ref, product_id, name,
+          unit_price_inr, unit_price_paise,
+          quantity,
+          gross_inr, gross_paise,
+          line_discount_inr, line_discount_paise,
+          net_inr, net_paise
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `);
+
+      for (const item of processedItems) {
+        const unitPricePaise = toPaise(item.unit_price_inr, 'unit_price');
+        const grossPaise = toPaise(item.gross_inr, 'gross');
+        const lineDiscountPaise = item.line_discount_inr !== null ? toPaise(item.line_discount_inr, 'line_discount') : null;
+        const netPaise = item.net_inr !== null ? toPaise(item.net_inr, 'net') : null;
+
+        insertItem.run(
+          orderRowId,
+          item.product_id,
+          item.name,
+          item.unit_price_inr,
+          unitPricePaise,
+          item.quantity,
+          item.gross_inr,
+          grossPaise,
+          item.line_discount_inr,
+          lineDiscountPaise,
+          item.net_inr,
+          netPaise
+        );
+      }
+    }
+
+    if (shouldManageTx) {
+      db.exec('COMMIT;');
+    }
+  } catch (err) {
+    if (shouldManageTx) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
   }
 
   return {
@@ -327,3 +431,4 @@ export function validateAndIngestOrder(
     items: processedItems
   };
 }
+

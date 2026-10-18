@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useBrand } from "@/components/AppShell";
 import { formatINR, formatINRWithPaise, shortINR, renderOrUnknown, formatIST, formatISTDateOnly } from "@/lib/formatters";
 import { api, ApiError } from "@/lib/apiClient";
@@ -30,6 +30,7 @@ type RegisteredPromo = {
   valid_to: string;
   status: 'not_yet_valid' | 'valid' | 'expired';
   use_count: number;
+  outside_validity_count?: number;
   last_used_at: string | null;
   units?: number;
   creator_fee?: number | null;
@@ -60,6 +61,15 @@ type RedemptionItem = {
   status: string;
   validity_flag: string;
   source?: string;
+  items?: Array<{
+    product_id: string;
+    name: string | null;
+    unit_price_inr: number;
+    quantity: number;
+    gross_inr: number;
+    line_discount_inr: number | null;
+    net_inr: number | null;
+  }>;
 };
 
 type UnregisteredOrder = {
@@ -191,6 +201,22 @@ export default function Home() {
   const [formValidTo, setFormValidTo] = useState(toISTISOString(plus30Days));
   const [formStatusMsg, setFormStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Live derived promo status preview for registration form
+  const previewStatus = useMemo(() => {
+    if (!formValidFrom || !formValidTo) return null;
+    try {
+      const from = new Date(formValidFrom).getTime();
+      const to = new Date(formValidTo).getTime();
+      if (isNaN(from) || isNaN(to) || from > to) return "invalid";
+      const cur = Date.now();
+      if (cur < from) return "not_yet_valid";
+      if (cur > to) return "expired";
+      return "valid";
+    } catch {
+      return null;
+    }
+  }, [formValidFrom, formValidTo]);
 
   // Drawer & Modal States
   const [activePromoModal, setActivePromoModal] = useState<string | null>(null);
@@ -756,10 +782,28 @@ export default function Home() {
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
             />
           </div>
-          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Derived Status Preview:</span>
+              {previewStatus === "valid" ? (
+                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  ● Active (Valid Now)
+                </span>
+              ) : previewStatus === "not_yet_valid" ? (
+                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                  ⏳ Scheduled (Not Yet Valid)
+                </span>
+              ) : previewStatus === "expired" ? (
+                <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                  ✖ Expired Window
+                </span>
+              ) : (
+                <span className="text-xs text-rose-500 font-medium">Invalid Dates (Valid From cannot be after Valid To)</span>
+              )}
+            </div>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || previewStatus === "invalid"}
               className="rounded-xl bg-indigo-600 px-6 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               {isSubmitting ? "Registering..." : "+ Register Promo Code"}
@@ -849,6 +893,9 @@ export default function Home() {
                   <th className="py-3">Validity Window</th>
                   <th className="py-3">Status</th>
                   <th className="py-3 text-right">Uses</th>
+                  <th className="py-3 text-right">Last Used</th>
+                  <th className="py-3 text-right">Units</th>
+                  <th className="py-3 text-right">Outside Window</th>
                   <th className="py-3 text-right">Reported Discount</th>
                   <th className="py-3 text-right">Actions</th>
                 </tr>
@@ -859,7 +906,7 @@ export default function Home() {
                   .map((p) => (
                   <tr key={p.code} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
                     <td className="py-3 font-mono font-bold text-indigo-700 dark:text-indigo-400">{p.code}</td>
-                    <td className="py-3">{p.creator_id}</td>
+                    <td className="py-3 font-medium">{p.creator_id}</td>
                     <td className="py-3 text-xs text-slate-500 dark:text-slate-400">
                       {formatISTDateOnly(p.valid_from)} to {formatISTDateOnly(p.valid_to)} IST
                     </td>
@@ -875,8 +922,21 @@ export default function Home() {
                       </span>
                     </td>
                     <td className="py-3 text-right font-semibold">{p.use_count}</td>
+                    <td className="py-3 text-right text-xs text-slate-500 dark:text-slate-400">
+                      {p.last_used_at ? formatIST(p.last_used_at) : "None yet"}
+                    </td>
+                    <td className="py-3 text-right font-semibold">{p.units ?? 0}</td>
+                    <td className="py-3 text-right">
+                      {p.outside_validity_count && p.outside_validity_count > 0 ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          {p.outside_validity_count} outside
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">0</span>
+                      )}
+                    </td>
                     <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-300">
-                      {formatINR(p.discount_inr)}
+                      {p.discount_inr !== null ? formatINR(p.discount_inr) : <span className="italic text-slate-400">unknown</span>}
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex justify-end gap-2">
@@ -890,7 +950,7 @@ export default function Home() {
                           onClick={() => openRedemptionsModal(p.code)}
                           className="rounded-lg bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300"
                         >
-                          View Orders
+                          Inspect ({p.use_count})
                         </button>
                       </div>
                     </td>
@@ -898,7 +958,7 @@ export default function Home() {
                 ))}
                 {registeredPromos.filter((p) => promoStatusFilter === "all" || p.status === promoStatusFilter).length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                    <td colSpan={10} className="py-8 text-center text-slate-400">
                       No promo codes match this filter. Register one above to begin tracking live checkout redemptions.
                     </td>
                   </tr>
@@ -1533,48 +1593,119 @@ export default function Home() {
             {loadingModal ? (
               <p className="py-12 text-center text-sm text-slate-500">Loading audit trail...</p>
             ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 uppercase text-slate-500 dark:border-slate-700">
-                      <th className="py-3">Order ID</th>
-                      <th className="py-3">Customer ID</th>
-                      <th className="py-3">Timestamp</th>
-                      <th className="py-3">Validity</th>
-                      <th className="py-3 text-right">Subtotal</th>
-                      <th className="py-3 text-right">Discount</th>
-                      <th className="py-3 text-right">Basis</th>
-                      <th className="py-3 text-right">Net Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modalRedemptions.map((o) => (
-                      <tr key={o.order_id} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
-                        <td className="py-3 font-mono font-bold">{renderOrUnknown(o.order_id)}</td>
-                        <td className="py-3 font-mono text-slate-500 dark:text-slate-400">{renderOrUnknown(o.customer_id)}</td>
-                        <td className="py-3 text-slate-600 dark:text-slate-300">{formatIST(o.used_at)}</td>
-                        <td className="py-3">
-                          <span className={`rounded-full px-2 py-0.5 font-semibold ${
-                            o.validity_flag === "valid" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
-                          }`}>
-                            {o.validity_flag}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right">{formatINR(o.subtotal_inr)}</td>
-                        <td className="py-3 text-right">{formatINR(o.discount_inr)}</td>
-                        <td className="py-3 text-right text-slate-500">{renderOrUnknown(o.discount_basis)}</td>
-                        <td className="py-3 text-right font-bold">{formatINR(o.total_inr)}</td>
-                      </tr>
-                    ))}
-                    {modalRedemptions.length === 0 && (
-                      <tr>
-                        <td colSpan={8} className="py-8 text-center text-slate-400">
-                          No order redemptions recorded for this promo code yet.
-                        </td>
-                      </tr>
+              <div className="mt-4 space-y-4">
+                {modalRedemptions.map((o) => (
+                  <div key={o.order_id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-bold text-indigo-700 dark:text-indigo-400">{o.order_id}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          source: {o.source || "website"}
+                        </span>
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          o.validity_flag === "valid" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" :
+                          o.validity_flag === "outside_validity" ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" :
+                          "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
+                        }`}>
+                          ● {o.validity_flag}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-slate-500 dark:text-slate-400">Customer: <code className="font-mono font-semibold">{renderOrUnknown(o.customer_id)}</code></span>
+                        <span className="text-slate-400">·</span>
+                        <span className="text-slate-500 dark:text-slate-400">{formatIST(o.used_at)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center text-xs dark:bg-slate-800/40">
+                      <div>
+                        <span className="text-slate-400 font-medium">Subtotal</span>
+                        <p className="mt-0.5 font-semibold text-slate-800 dark:text-slate-200">{formatINR(o.subtotal_inr)}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium">Discount</span>
+                        <p className="mt-0.5 font-semibold">
+                          {o.discount_inr === null ? (
+                            <span className="text-slate-400 italic">unknown</span>
+                          ) : (
+                            <>
+                              {formatINR(o.discount_inr)}{" "}
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                                {o.discount_basis === "estimated" ? "derived" : "reported"}
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium">Net Total</span>
+                        <p className="mt-0.5 font-bold text-emerald-700 dark:text-emerald-400">
+                          {o.total_inr === null ? (
+                            <span className="text-slate-400 italic font-normal">unknown</span>
+                          ) : (
+                            formatINR(o.total_inr)
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Itemized product drawer */}
+                    {o.items && o.items.length > 0 && (
+                      <div className="mt-3 overflow-x-auto rounded-xl border border-slate-100 p-2.5 dark:border-slate-800/80">
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Purchased Products ({o.items.length})</p>
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-100 text-[11px] uppercase text-slate-400 dark:border-slate-800">
+                              <th className="py-1">Product</th>
+                              <th className="py-1 text-right">Unit Price</th>
+                              <th className="py-1 text-right">Qty</th>
+                              <th className="py-1 text-right">Gross</th>
+                              <th className="py-1 text-right">Line Discount</th>
+                              <th className="py-1 text-right">Net</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {o.items.map((item, idx) => (
+                              <tr key={idx} className="border-b border-slate-50 last:border-b-0 dark:border-slate-800/30">
+                                <td className="py-1.5 font-medium">
+                                  {item.name || item.product_id}{" "}
+                                  <span className="font-mono text-[10px] text-slate-400">({item.product_id})</span>
+                                </td>
+                                <td className="py-1.5 text-right font-mono">{formatINR(item.unit_price_inr)}</td>
+                                <td className="py-1.5 text-right font-semibold">x{item.quantity}</td>
+                                <td className="py-1.5 text-right font-mono">{formatINR(item.gross_inr)}</td>
+                                <td className="py-1.5 text-right">
+                                  {item.line_discount_inr === null ? (
+                                    <span className="text-slate-400 italic">unknown</span>
+                                  ) : (
+                                    <>
+                                      {formatINR(item.line_discount_inr)}{" "}
+                                      <span className="text-[10px] text-slate-400">
+                                        ({o.discount_basis === "estimated" ? "derived" : "reported"})
+                                      </span>
+                                    </>
+                                  )}
+                                </td>
+                                <td className="py-1.5 text-right font-bold font-mono">
+                                  {item.net_inr === null ? (
+                                    <span className="text-slate-400 italic font-normal">unknown</span>
+                                  ) : (
+                                    formatINR(item.net_inr)
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
-                  </tbody>
-                </table>
+                  </div>
+                ))}
+                {modalRedemptions.length === 0 && (
+                  <div className="py-12 text-center text-slate-400">
+                    No order redemptions recorded for this promo code yet.
+                  </div>
+                )}
               </div>
             )}
           </div>

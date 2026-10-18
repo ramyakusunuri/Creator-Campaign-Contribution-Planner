@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 
 export interface Migration {
   version: number;
@@ -161,6 +161,48 @@ export const MIGRATIONS: Migration[] = [
         UPDATE creators SET default_cp_paise = CAST(ROUND(default_cp_inr * 100) AS INTEGER) WHERE default_cp_paise IS NULL AND default_cp_inr IS NOT NULL;
         UPDATE refund_events SET amount_paise = CAST(ROUND(amount_inr * 100) AS INTEGER) WHERE amount_paise IS NULL AND amount_inr IS NOT NULL;
       `);
+    }
+  },
+  {
+    version: 3,
+    name: '003_b3_promo_lifecycle_and_unregistered',
+    up: (db: DatabaseSync) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS promo_code_audit (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          brand_id TEXT NOT NULL,
+          code TEXT NOT NULL,
+          old_valid_from TEXT,
+          old_valid_to TEXT,
+          new_valid_from TEXT,
+          new_valid_to TEXT,
+          updated_at TEXT NOT NULL,
+          changed_by TEXT NOT NULL DEFAULT 'brand_dashboard'
+        );
+
+        CREATE TABLE IF NOT EXISTS unregistered_code_uses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          brand_id TEXT NOT NULL,
+          order_id TEXT NOT NULL,
+          code_entered TEXT NOT NULL,
+          customer_id TEXT NOT NULL,
+          subtotal_inr REAL NOT NULL,
+          subtotal_paise INTEGER NOT NULL,
+          discount_inr REAL NULL,
+          discount_paise INTEGER NULL,
+          total_inr REAL NULL,
+          total_paise INTEGER NULL,
+          used_at TEXT NOT NULL,
+          payment_confirmed_at TEXT NULL,
+          raw_payload TEXT,
+          created_at TEXT NOT NULL,
+          UNIQUE(brand_id, order_id)
+        );
+      `);
+
+      try {
+        db.exec("ALTER TABLE orders ADD COLUMN payment_confirmed_at TEXT NULL;");
+      } catch {}
     }
   }
 ];

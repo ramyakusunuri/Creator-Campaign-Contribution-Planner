@@ -216,6 +216,140 @@ export function createApp({
         }
       }
 
+      // --- V1 ENDPOINTS ---
+      // GET /api/v1/codes/check?code=...
+      if (pathname === '/api/v1/codes/check' && req.method === 'GET') {
+        const reportKey = req.headers['x-report-key'];
+        if (!reportKey) {
+          const err = new Error('Unauthorized: Missing X-Report-Key header');
+          err.status = 401;
+          throw err;
+        }
+
+        const brand = brandsData.find(b => (b.report_keys || []).some(k => timingSafeMatch(reportKey, k)));
+        if (!brand) {
+          const err = new Error('Unauthorized: Invalid X-Report-Key');
+          err.status = 401;
+          throw err;
+        }
+
+        const codeParam = query.get('code');
+        if (!codeParam || codeParam.trim() === '') {
+          sendJson(res, 400, { error: 'Query parameter "code" is required' });
+          return;
+        }
+
+        let cleanCode;
+        try {
+          cleanCode = validatePromoCodeFormat(codeParam);
+        } catch (err) {
+          sendJson(res, 400, { error: err.message });
+          return;
+        }
+
+        const promo = store.getPromo(brand.brand_id, cleanCode);
+        if (!promo) {
+          sendJson(res, 200, {
+            code: cleanCode,
+            valid: false,
+            status: 'unknown',
+            starts_at: null,
+            expires_at: null
+          });
+          return;
+        }
+
+        const status = derivePromoStatus(promo.valid_from, promo.valid_to);
+        sendJson(res, 200, {
+          code: cleanCode,
+          valid: status === 'valid',
+          status,
+          starts_at: promo.valid_from,
+          expires_at: promo.valid_to
+        });
+        return;
+      }
+
+      // POST /api/v1/orders/report
+      if (pathname === '/api/v1/orders/report' && req.method === 'POST') {
+        const reportKey = req.headers['x-report-key'];
+        if (!reportKey) {
+          const err = new Error('Unauthorized: Missing X-Report-Key header');
+          err.status = 401;
+          throw err;
+        }
+
+        const brand = brandsData.find(b => (b.report_keys || []).some(k => timingSafeMatch(reportKey, k)));
+        if (!brand) {
+          const err = new Error('Unauthorized: Invalid X-Report-Key');
+          err.status = 401;
+          throw err;
+        }
+
+        const body = await readJsonBody(req);
+        if (!body.payment_confirmed_at) {
+          sendJson(res, 400, { error: 'Field "payment_confirmed_at" is required and cannot be null or undefined.' });
+          return;
+        }
+
+        const validated = validateOrderPayload(body);
+        const codeEntered = (body.promo_code || body.code || '').trim().toUpperCase();
+
+        const promo = codeEntered ? store.getPromo(brand.brand_id, codeEntered) : null;
+        let registered = false;
+        let validityFlag = 'unregistered';
+
+        if (promo) {
+          registered = true;
+          const usedTime = new Date(validated.used_at).getTime();
+          const fromTime = new Date(promo.valid_from).getTime();
+          const toTime = new Date(promo.valid_to).getTime();
+
+          if (usedTime < fromTime || usedTime > toTime) {
+            validityFlag = 'outside_validity';
+          } else {
+            validityFlag = 'valid';
+          }
+        }
+
+        const payloadHash = canonicalHash(body);
+
+        const useRecordData = {
+          order_id: validated.order_id,
+          code_entered: codeEntered,
+          registered,
+          customer_id: validated.customer_id,
+          used_at: validated.used_at,
+          payment_confirmed_at: validated.payment_confirmed_at,
+          received_at: new Date().toISOString(),
+          discount_paise: validated.discount_paise,
+          line_discount_basis: validated.line_discount_basis,
+          source: 'website',
+          validity_flag: validityFlag,
+          payload_raw: JSON.stringify(body),
+          payload_hash: payloadHash
+        };
+
+        const result = store.recordUse(brand.brand_id, useRecordData, validated.items);
+
+        if (result.duplicate) {
+          sendJson(res, 200, { duplicate: true, order_id: validated.order_id });
+          return;
+        }
+
+        sendJson(res, 201, {
+          success: true,
+          registered,
+          validity_flag: validityFlag,
+          order_id: validated.order_id,
+          promo_code: codeEntered || null,
+          subtotal_inr: fromPaise(validated.subtotal_paise),
+          discount_inr: fromPaise(validated.discount_paise),
+          total_inr: fromPaise(validated.total_paise)
+        });
+        return;
+      }
+
       // Brand Route patterns:
       // /brands/:brandId/...
       const brandRouteMatch = pathname.match(/^\/brands\/([^/]+)(.*)$/);
@@ -251,6 +385,13 @@ export function createApp({
         authenticate(req, brandId, ['brand']);
         const body = await readJsonBody(req);
 
+        const ALLOWED_PROMO_FIELDS = new Set(['code', 'creator_id', 'valid_from', 'valid_to', 'starts_at', 'expires_at']);
+        const extraFields = Object.keys(body).filter(k => !ALLOWED_PROMO_FIELDS.has(k));
+        if (extraFields.length > 0) {
+          sendJson(res, 400, { error: `unexpected field: ${extraFields.join(', ')}` });
+          return;
+        }
+
         const code = validatePromoCodeFormat(body.code);
         if (!body.creator_id || typeof body.creator_id !== 'string') {
           const err = new Error('Field "creator_id" is required and must be a string.');
@@ -265,8 +406,19 @@ export function createApp({
           throw err;
         }
 
-        const validFrom = parseAndValidateIsoDate('valid_from', body.valid_from);
-        const validTo = parseAndValidateIsoDate('valid_to', body.valid_to);
+        const rawStartsAt = body.starts_at !== undefined ? body.starts_at : body.valid_from;
+        const rawExpiresAt = body.expires_at !== undefined ? body.expires_at : body.valid_to;
+        if (!rawStartsAt) {
+          sendJson(res, 400, { error: 'Field "starts_at" (or "valid_from") is required.' });
+          return;
+        }
+        if (!rawExpiresAt) {
+          sendJson(res, 400, { error: 'Field "expires_at" (or "valid_to") is required.' });
+          return;
+        }
+
+        const validFrom = parseAndValidateIsoDate('starts_at', rawStartsAt);
+        const validTo = parseAndValidateIsoDate('expires_at', rawExpiresAt);
 
         if (validFrom.getTime() >= validTo.getTime()) {
           const err = new Error('Field "valid_from" must be strictly earlier than "valid_to".');
@@ -329,12 +481,21 @@ export function createApp({
         const code = patchPromoMatch[1].toUpperCase();
         const body = await readJsonBody(req);
 
-        const patchData = {};
-        if (body.valid_from !== undefined) {
-          patchData.valid_from = parseAndValidateIsoDate('valid_from', body.valid_from).toISOString();
+        const ALLOWED_PATCH_FIELDS = new Set(['valid_from', 'valid_to', 'starts_at', 'expires_at']);
+        const extraFields = Object.keys(body).filter(k => !ALLOWED_PATCH_FIELDS.has(k));
+        if (extraFields.length > 0) {
+          sendJson(res, 400, { error: `unexpected field: ${extraFields.join(', ')}` });
+          return;
         }
-        if (body.valid_to !== undefined) {
-          patchData.valid_to = parseAndValidateIsoDate('valid_to', body.valid_to).toISOString();
+
+        const patchData = {};
+        const rawStartsAt = body.starts_at !== undefined ? body.starts_at : body.valid_from;
+        const rawExpiresAt = body.expires_at !== undefined ? body.expires_at : body.valid_to;
+        if (rawStartsAt !== undefined) {
+          patchData.valid_from = parseAndValidateIsoDate('starts_at', rawStartsAt).toISOString();
+        }
+        if (rawExpiresAt !== undefined) {
+          patchData.valid_to = parseAndValidateIsoDate('expires_at', rawExpiresAt).toISOString();
         }
 
         const updated = store.patchPromo(brandId, code, patchData);
@@ -345,6 +506,12 @@ export function createApp({
         sseHub.publish(brandId, 'code_updated', responseData);
 
         sendJson(res, 200, responseData);
+        return;
+      }
+
+      // DELETE /brands/:brandId/promo-codes/:code
+      if (patchPromoMatch && req.method === 'DELETE') {
+        sendJson(res, 405, { error: 'Method Not Allowed: Promo codes cannot be deleted; modify validity dates instead.' });
         return;
       }
 

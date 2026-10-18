@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { authenticateBrand } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { authenticateBrand } from '../../../../../../lib/auth.ts';
+import { getDb } from '../../../../../../lib/db.ts';
 import {
   parseAndValidateIsoDate,
   derivePromoStatus,
   validatePromoCodeFormat
-} from '@/lib/promoLogic';
+} from '../../../../../../lib/promoLogic.ts';
 import {
   calculateRetainedSales,
   calculatePreFeeContribution,
@@ -13,12 +12,12 @@ import {
   calculateIncrementalContribution,
   calculateBreakEvenShare,
   round2
-} from '@/lib/calculator';
+} from '../../../../../../lib/calculator.ts';
 
-const ALLOWED_PATCH_FIELDS = new Set(['valid_from', 'valid_to']);
+const ALLOWED_PATCH_FIELDS = new Set(['valid_from', 'valid_to', 'starts_at', 'expires_at']);
 
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { brandId: string; code: string } }
 ) {
   const { brandId, code } = params;
@@ -44,7 +43,7 @@ export async function GET(
     | undefined;
 
   if (!promo) {
-    return NextResponse.json({ error: `Promo code "${cleanCode}" not found.` }, { status: 404 });
+    return Response.json({ error: `Promo code "${cleanCode}" not found.` }, { status: 404 });
   }
 
   const creator = db
@@ -275,7 +274,7 @@ export async function GET(
   const costPerUnit = fee && totalUnits > 0 ? round2(fee / totalUnits, 'costPerUnit') : null;
   const costPerUnitStatus = !fee ? 'fee_unknown' : totalUnits === 0 ? 'no_units' : 'ok';
 
-  return NextResponse.json({
+  return Response.json({
     code: promo.code,
     creator_id: promo.creator_id,
     brand_id: promo.brand_id,
@@ -311,7 +310,7 @@ export async function GET(
 }
 
 export async function PATCH(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { brandId: string; code: string } }
 ) {
   const { brandId, code } = params;
@@ -330,43 +329,45 @@ export async function PATCH(
     | undefined;
 
   if (!existing) {
-    return NextResponse.json({ error: `Promo code "${cleanCode}" not found.` }, { status: 404 });
+    return Response.json({ error: `Promo code "${cleanCode}" not found.` }, { status: 404 });
   }
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON request payload' }, { status: 400 });
+    return Response.json({ error: 'Invalid JSON request payload' }, { status: 400 });
   }
 
   const extraFields = Object.keys(body).filter((k) => !ALLOWED_PATCH_FIELDS.has(k));
   if (extraFields.length > 0) {
-    return NextResponse.json(
+    return Response.json(
       { error: `unexpected field: ${extraFields.join(', ')}` },
       { status: 400 }
     );
   }
 
   if (Object.keys(body).length === 0) {
-    return NextResponse.json({ error: 'At least one date field must be provided to update.' }, { status: 400 });
+    return Response.json({ error: 'At least one date field must be provided to update.' }, { status: 400 });
   }
 
-  const newValidFromStr = 'valid_from' in body ? body.valid_from : existing.valid_from;
-  const newValidToStr = 'valid_to' in body ? body.valid_to : existing.valid_to;
+  const newValidFromStr = (body.starts_at !== undefined ? body.starts_at : body.valid_from) ?? existing.valid_from;
+  const newValidToStr = (body.expires_at !== undefined ? body.expires_at : body.valid_to) ?? existing.valid_to;
 
   let validFromDate: Date;
   let validToDate: Date;
   try {
-    validFromDate = parseAndValidateIsoDate('valid_from', newValidFromStr);
-    validToDate = parseAndValidateIsoDate('valid_to', newValidToStr);
+    const startsAtField = body.starts_at !== undefined ? 'starts_at' : 'valid_from';
+    const expiresAtField = body.expires_at !== undefined ? 'expires_at' : 'valid_to';
+    validFromDate = parseAndValidateIsoDate(startsAtField, newValidFromStr);
+    validToDate = parseAndValidateIsoDate(expiresAtField, newValidToStr);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    return Response.json({ error: err.message }, { status: 400 });
   }
 
   if (validFromDate.getTime() > validToDate.getTime()) {
-    return NextResponse.json(
-      { error: 'Field "valid_from" must not be after "valid_to".' },
+    return Response.json(
+      { error: 'Field "starts_at" (or "valid_from") must not be after "expires_at" (or "valid_to").' },
       { status: 400 }
     );
   }
@@ -379,6 +380,22 @@ export async function PATCH(
     SET valid_from = ?, valid_to = ?
     WHERE brand_id = ? AND code = ?;
   `).run(validFromIso, validToIso, brandId, cleanCode);
+
+  // Write to promo_code_audit table
+  db.prepare(`
+    INSERT INTO promo_code_audit (
+      brand_id, code, old_valid_from, old_valid_to, new_valid_from, new_valid_to, updated_at, changed_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+  `).run(
+    brandId,
+    cleanCode,
+    existing.valid_from,
+    existing.valid_to,
+    validFromIso,
+    validToIso,
+    new Date().toISOString(),
+    'brand_dashboard'
+  );
 
   // Write audit log entry
   db.prepare(`
@@ -393,17 +410,27 @@ export async function PATCH(
 
   const responsePayload = {
     code: cleanCode,
+    starts_at: validFromIso,
+    expires_at: validToIso,
     valid_from: validFromIso,
     valid_to: validToIso,
     status: derivePromoStatus(validFromIso, validToIso)
   };
 
   try {
-    const { getSseHub } = await import('@/lib/sseHub');
+    const { getSseHub } = await import('../../../../../../lib/sseHub.ts');
     getSseHub().publish(brandId, 'code_updated', responsePayload);
   } catch (err) {
     console.error('Failed to publish code_updated SSE event:', err);
   }
 
-  return NextResponse.json(responsePayload);
+  return Response.json(responsePayload);
 }
+
+export async function DELETE() {
+  return Response.json(
+    { error: 'Method Not Allowed: Promo codes cannot be deleted; modify validity dates instead.' },
+    { status: 405 }
+  );
+}
+

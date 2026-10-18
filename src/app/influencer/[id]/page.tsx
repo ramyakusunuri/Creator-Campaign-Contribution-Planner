@@ -4,7 +4,6 @@ import { fetchCreators, fetchPersona } from "../../../lib/creators-db";
 import CouponEditor from "./CouponEditor";
 import { ordersFor, statsFor } from "../../../lib/orders";
 import { money, shortMoney, compact } from "../../../lib/format";
-import PersonalizedPerformanceGraphs from "../../../components/PersonalizedPerformanceGraphs";
 
 export const revalidate=60; // re-read the database at most once a minute
 export async function generateStaticParams(){return (await fetchCreators()).map(c=>({id:c.slug}));}
@@ -31,6 +30,5 @@ export default async function InfluencerProfile({params}:{params:{id:string}}){
   </section>
   <section className="rounded-2xl border border-slate-200 bg-white"><div className="overflow-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead className="sticky top-0 bg-white"><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="px-4 py-3">Name of person / Customer Id</th><th className="px-4 py-3">Item</th><th className="px-4 py-3 text-right">Price</th><th className="px-4 py-3">Status</th></tr></thead><tbody>{orders.map((o,i)=><tr key={i} className="border-b border-slate-100"><td className="px-4 py-3 font-medium">{o.customer}</td><td className="px-4 py-3">{o.item}</td><td className="px-4 py-3 text-right">{o.price}</td><td className={`px-4 py-3 ${o.status==="Returned"?"text-rose-600":o.status==="Delivered"?"text-emerald-700":"text-amber-700"}`}>{o.status}</td></tr>)}</tbody></table></div></section>
   <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{stats.map(([k,v])=><div key={k} className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{k}</p><p className={`mt-2 text-2xl font-bold ${k==="Net profit by influencer"&&s.netProfit<0?"text-rose-600":""}`}>{v}</p></div>)}</section>
-  <PersonalizedPerformanceGraphs name={c.name} monthlyOrders={c.orders} averageOrderValue={Math.round(c.sp*(1-c.discount/100))} estimatedRate={c.fee} productCostRate={c.sp>0?c.cp/c.sp:0.4} growthRate={0.03}/>
  </div></main>;
 }

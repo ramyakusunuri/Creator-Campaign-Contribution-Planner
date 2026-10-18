@@ -18,6 +18,18 @@ async function reader() {
 
 type Fin = { orders: number; discount: number; sp: number; cp: number; fee: number };
 
+// Normalises a followers-per-platform object (from the database or the bundled JSON) to Record<string, number>.
+function toFollowerMap(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (value && typeof value === "object") {
+    for (const [platform, count] of Object.entries(value)) {
+      if (typeof count === "number" && Number.isFinite(count)) out[platform] = count;
+      else if (typeof count === "string" && count.trim() !== "" && Number.isFinite(Number(count))) out[platform] = Number(count);
+    }
+  }
+  return out;
+}
+
 export async function fetchCreators(): Promise<Creator[]> {
   try {
     const sb = await reader();
@@ -50,19 +62,14 @@ export async function fetchPersona(slug: string): Promise<PersonaLite | null> {
     const sb = await reader();
     if (sb) {
       const { data, error } = await sb.from("creators").select("slug,name,platform_followers").eq("slug", slug).maybeSingle();
-      if (!error && data) return { id: data.slug, name: data.name, platform_followers: data.platform_followers ?? {} };
+      if (!error && data) return { id: data.slug, name: data.name, platform_followers: toFollowerMap(data.platform_followers) };
       if (!error) return null; // reachable, and no such creator
     }
   } catch {}
   const p = seed.find(x => x.id === slug);
-  return p
-  ? {
-      id: p.id,
-      name: p.name,
-      platform_followers: Object.fromEntries(
-        Object.entries(p.platform_followers).filter(
-          ([, value]) => typeof value === "number"
-        )
-      ) as Record<string, number>,
-    }
-  : null;
+<<<<<<< HEAD
+  return p ? { id: p.id, name: p.name, platform_followers: toFollowerMap(p.platform_followers) } : null;
+=======
+  return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers as Record<string, number> } : null;
+>>>>>>> d200ce53bf2ee648b98553d051910e9296c15d9a
+}

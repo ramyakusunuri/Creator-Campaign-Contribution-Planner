@@ -1,6 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/api/brands/[brandId]/promo-codes/route": "app/api/brands/[brandId]/promo-codes/route.js",
-  "/api/creators/route": "app/api/creators/route.js",
-  "/api/brands/[brandId]/promo-codes/[code]/route": "app/api/brands/[brandId]/promo-codes/[code]/route.js"
-}

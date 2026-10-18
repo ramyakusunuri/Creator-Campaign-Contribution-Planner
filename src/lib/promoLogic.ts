@@ -98,3 +98,46 @@ export function checkEligibility(
 
   return { eligible: true };
 }
+
+import crypto from 'node:crypto';
+
+export function toPaise(val: number, fieldName: string = 'amount'): number {
+  if (val === null || val === undefined) {
+    throw new TypeError(`Field "${fieldName}" is required and cannot be null or undefined.`);
+  }
+  if (typeof val !== 'number' || !Number.isFinite(val)) {
+    throw new TypeError(`Field "${fieldName}" must be a finite number. Received: ${val}`);
+  }
+  const str = String(val);
+  const dotIndex = str.indexOf('.');
+  if (dotIndex !== -1 && str.length - dotIndex - 1 > 2) {
+    const err: any = new RangeError(`Field "${fieldName}" cannot have more than 2 decimal places. Received: ${val}`);
+    err.status = 400;
+    throw err;
+  }
+  return Math.round((val + Number.EPSILON) * 100);
+}
+
+export function fromPaise(paise: number | null | undefined): number | null {
+  if (paise === null || paise === undefined) {
+    return null;
+  }
+  return Math.round((paise / 100 + Number.EPSILON) * 100) / 100;
+}
+
+export function canonicalJson(obj: any): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalJson).join(',') + ']';
+  }
+  const sortedKeys = Object.keys(obj).sort();
+  const pairs = sortedKeys.map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`);
+  return '{' + pairs.join(',') + '}';
+}
+
+export function canonicalHash(obj: any): string {
+  const canonical = canonicalJson(obj);
+  return crypto.createHash('sha256').update(canonical, 'utf8').digest('hex');
+}

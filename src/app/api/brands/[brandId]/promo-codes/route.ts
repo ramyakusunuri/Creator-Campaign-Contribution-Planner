@@ -102,16 +102,22 @@ export async function POST(
 
   const status = derivePromoStatus(validFromIso, validToIso);
 
-  return NextResponse.json(
-    {
-      code: cleanCode,
-      creator_id: creatorId,
-      valid_from: validFromIso,
-      valid_to: validToIso,
-      status
-    },
-    { status: 201 }
-  );
+  const responsePayload = {
+    code: cleanCode,
+    creator_id: creatorId,
+    valid_from: validFromIso,
+    valid_to: validToIso,
+    status
+  };
+
+  try {
+    const { getSseHub } = await import('@/lib/sseHub');
+    getSseHub().publish(brandId, 'promo_created', responsePayload);
+  } catch (err) {
+    console.error('Failed to publish promo_created SSE event:', err);
+  }
+
+  return NextResponse.json(responsePayload, { status: 201 });
 }
 
 export async function GET(
@@ -172,6 +178,27 @@ export async function GET(
       }
     }
 
+    const creator = db.prepare('SELECT default_fee_inr FROM creators WHERE creator_id = ?;').get(promo.creator_id) as any;
+    const fee = creator?.default_fee_inr ?? null;
+
+    const unitsRow = db.prepare(`
+      SELECT SUM(oi.quantity) as total_units
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id_ref
+      WHERE o.brand_id = ? AND o.promo_code = ? AND o.status != 'cancelled' AND o.status != 'refunded';
+    `).get(brandId, promo.code) as any;
+    const units = unitsRow?.total_units || 0;
+
+    let cost_per_unit: number | null = null;
+    let cost_per_unit_status: 'ok' | 'fee_unknown' | 'no_units' = 'ok';
+    if (fee === null || fee === undefined) {
+      cost_per_unit_status = 'fee_unknown';
+    } else if (units === 0) {
+      cost_per_unit_status = 'no_units';
+    } else {
+      cost_per_unit = Math.round((fee / units) * 100) / 100;
+    }
+
     return {
       code: promo.code,
       creator_id: promo.creator_id,
@@ -180,6 +207,11 @@ export async function GET(
       status: derivePromoStatus(promo.valid_from, promo.valid_to),
       use_count,
       last_used_at,
+      units,
+      creator_fee: fee,
+      cost_per_unit,
+      cost_per_unit_status,
+      cost_per_unit_basis: 'returns not deducted',
       discount_inr: hasUnknownDiscount ? null : Math.round(totalDiscount * 100) / 100,
       total_inr: hasUnknownDiscount ? null : Math.round(totalRevenue * 100) / 100
     };

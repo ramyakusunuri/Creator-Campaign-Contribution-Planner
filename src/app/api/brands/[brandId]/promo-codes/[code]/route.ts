@@ -212,15 +212,17 @@ export async function GET(
         ? 'mixed'
         : (Array.from(p.bases)[0] as 'reported' | 'estimated');
 
+    const allocatedFee = fee && totalUnits > 0 ? round2((p.quantity / totalUnits) * fee, 'allocatedFee') : null;
     return {
       product_id: p.product_id,
       name: p.name,
-      quantity: p.quantity,
+      units: p.quantity,
       gross_inr: gross,
       discount_inr: disc,
       net_inr: net,
       avg_unit_price_inr: avgPrice,
-      discount_basis: basis
+      discount_basis: basis,
+      allocated_fee: allocatedFee
     };
   });
 
@@ -270,6 +272,9 @@ export async function GET(
     breakEvenShare = calculateBreakEvenShare(preFeeContributionInr, fee);
   }
 
+  const costPerUnit = fee && totalUnits > 0 ? round2(fee / totalUnits, 'costPerUnit') : null;
+  const costPerUnitStatus = !fee ? 'fee_unknown' : totalUnits === 0 ? 'no_units' : 'ok';
+
   return NextResponse.json({
     code: promo.code,
     creator_id: promo.creator_id,
@@ -282,6 +287,10 @@ export async function GET(
     last_used_at,
     outside_validity_uses,
     units: totalUnits,
+    creator_fee: fee,
+    cost_per_unit: costPerUnit,
+    cost_per_unit_status: costPerUnitStatus,
+    cost_per_unit_basis: 'returns not deducted',
     subtotal_inr,
     discount_inr,
     total_inr,
@@ -382,10 +391,19 @@ export async function PATCH(
     JSON.stringify({ code: cleanCode, valid_from: validFromIso, valid_to: validToIso })
   );
 
-  return NextResponse.json({
+  const responsePayload = {
     code: cleanCode,
     valid_from: validFromIso,
     valid_to: validToIso,
     status: derivePromoStatus(validFromIso, validToIso)
-  });
+  };
+
+  try {
+    const { getSseHub } = await import('@/lib/sseHub');
+    getSseHub().publish(brandId, 'code_updated', responsePayload);
+  } catch (err) {
+    console.error('Failed to publish code_updated SSE event:', err);
+  }
+
+  return NextResponse.json(responsePayload);
 }

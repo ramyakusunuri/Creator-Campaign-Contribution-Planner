@@ -1,9 +1,10 @@
 import { getDb } from './db.ts';
 import { round2 } from './calculator.ts';
 import { parseAndValidateIsoDate, ISO_WITH_TZ_REGEX } from './promoLogic.ts';
+import { validateMoneyDecimals, toPaise } from './moneyValidation.ts';
 import type { LineItemRecord, OrderStatus, ValidityFlag } from '../types/ecommerce.ts';
 
-const ALLOWED_ORDER_FIELDS = new Set(['order_id', 'customer_id', 'used_at', 'items', 'discount_inr', 'promo_code', 'code']);
+const ALLOWED_ORDER_FIELDS = new Set(['order_id', 'customer_id', 'used_at', 'payment_confirmed_at', 'items', 'discount_inr', 'promo_code', 'code']);
 const ALLOWED_ITEM_FIELDS = new Set(['product_id', 'name', 'unit_price_inr', 'quantity', 'line_discount_inr']);
 const FORBIDDEN_PII_FIELDS = new Set(['name', 'email', 'customer_email', 'phone', 'customer_phone', 'address', 'shipping_address', 'billing_address']);
 
@@ -27,6 +28,12 @@ export function validateAndIngestOrder(
 ): IngestOrderResult {
   if (typeof rawPayload !== 'object' || rawPayload === null || Array.isArray(rawPayload)) {
     throw { status: 400, message: 'Payload must be a JSON object.' };
+  }
+
+  // Decimal precision guard: reject any financial field with > 2 decimal places with 400 Bad Request
+  const decimalValidation = validateMoneyDecimals(rawPayload);
+  if (!decimalValidation.valid) {
+    throw { status: 400, message: decimalValidation.error };
   }
 
   // Check for forbidden PII fields
@@ -238,13 +245,20 @@ export function validateAndIngestOrder(
     }
   }
 
+  const subtotalPaise = toPaise(subtotal, 'subtotal');
+  const discountPaise = finalOrderDiscount !== null ? toPaise(finalOrderDiscount, 'discount') : null;
+  const totalPaise = finalTotal !== null ? toPaise(finalTotal, 'total') : null;
+
   // Insert into database atomically
   const insertOrder = db.prepare(`
     INSERT INTO orders (
       brand_id, order_id, promo_code, customer_id, used_at,
-      subtotal_inr, discount_inr, discount_basis, total_inr,
+      subtotal_inr, subtotal_paise,
+      discount_inr, discount_paise,
+      discount_basis,
+      total_inr, total_paise,
       status, validity_flag, raw_payload
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `);
 
   const orderResult = insertOrder.run(
@@ -254,9 +268,12 @@ export function validateAndIngestOrder(
     customerId,
     usedAtIso,
     subtotal,
+    subtotalPaise,
     finalOrderDiscount,
+    discountPaise,
     finalBasis,
     finalTotal,
+    totalPaise,
     'completed',
     validityFlag,
     JSON.stringify(rawPayload)
@@ -266,21 +283,34 @@ export function validateAndIngestOrder(
 
   const insertItem = db.prepare(`
     INSERT INTO order_items (
-      order_id_ref, product_id, name, unit_price_inr, quantity,
-      gross_inr, line_discount_inr, net_inr
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+      order_id_ref, product_id, name,
+      unit_price_inr, unit_price_paise,
+      quantity,
+      gross_inr, gross_paise,
+      line_discount_inr, line_discount_paise,
+      net_inr, net_paise
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `);
 
   for (const item of processedItems) {
+    const unitPricePaise = toPaise(item.unit_price_inr, 'unit_price');
+    const grossPaise = toPaise(item.gross_inr, 'gross');
+    const lineDiscountPaise = item.line_discount_inr !== null ? toPaise(item.line_discount_inr, 'line_discount') : null;
+    const netPaise = item.net_inr !== null ? toPaise(item.net_inr, 'net') : null;
+
     insertItem.run(
       orderRowId,
       item.product_id,
       item.name,
       item.unit_price_inr,
+      unitPricePaise,
       item.quantity,
       item.gross_inr,
+      grossPaise,
       item.line_discount_inr,
-      item.net_inr
+      lineDiscountPaise,
+      item.net_inr,
+      netPaise
     );
   }
 

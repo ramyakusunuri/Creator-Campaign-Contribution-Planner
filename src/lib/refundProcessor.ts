@@ -1,5 +1,6 @@
 import { getDb } from './db.ts';
 import { round2 } from './calculator.ts';
+import { validateMoneyDecimals, toPaise } from './moneyValidation.ts';
 
 export interface RefundInput {
   brand_id: string;
@@ -24,6 +25,8 @@ export function processRefund(input: RefundInput): {
   if (typeof amount_inr !== 'number' || !Number.isFinite(amount_inr) || amount_inr <= 0) {
     throw { status: 400, message: 'Field "amount_inr" must be a finite number > 0.' };
   }
+
+  validateMoneyDecimals({ amount_inr }, ['amount_inr']);
 
   const db = getDb();
 
@@ -57,18 +60,20 @@ export function processRefund(input: RefundInput): {
   }
 
   const roundedAmount = round2(amount_inr, 'refund_amount');
+  const amountPaise = toPaise(roundedAmount)!;
   const targetTotal = order.total_inr ?? order.subtotal_inr;
   const isFull = input.is_full_refund === true || roundedAmount >= targetTotal;
   const newStatus = isFull ? 'refunded' : 'partially_refunded';
 
   db.prepare(`
-    INSERT INTO refund_events (brand_id, refund_id, order_id, amount_inr, is_full_refund, created_at)
-    VALUES (?, ?, ?, ?, ?, ?);
+    INSERT INTO refund_events (brand_id, refund_id, order_id, amount_inr, amount_paise, is_full_refund, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?);
   `).run(
     brand_id,
     refund_id,
     order_id,
     roundedAmount,
+    amountPaise,
     isFull ? 1 : 0,
     new Date().toISOString()
   );

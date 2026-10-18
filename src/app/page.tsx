@@ -1,5 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useBrand } from "@/components/AppShell";
+import { formatINR, formatINRWithPaise, shortINR, renderOrUnknown, formatIST, formatISTDateOnly } from "@/lib/formatters";
+import { api, ApiError } from "@/lib/apiClient";
 
 type Creator = {
   id: number;
@@ -11,7 +14,6 @@ type Creator = {
   sp: number;
   cp: number;
   fee: number;
-  // Live Observed Metrics (if available)
   liveOrders?: number;
   liveReturns?: number;
   liveAov?: number | null;
@@ -29,6 +31,11 @@ type RegisteredPromo = {
   status: 'not_yet_valid' | 'valid' | 'expired';
   use_count: number;
   last_used_at: string | null;
+  units?: number;
+  creator_fee?: number | null;
+  cost_per_unit?: number | null;
+  cost_per_unit_status?: 'ok' | 'fee_unknown' | 'no_units';
+  cost_per_unit_basis?: string;
   discount_inr: number | null;
   total_inr: number | null;
 };
@@ -39,6 +46,7 @@ type CreatorOption = {
   category: string;
   eligible: boolean;
   eligibility_reason?: string;
+  default_fee_inr?: number;
 };
 
 type RedemptionItem = {
@@ -51,15 +59,25 @@ type RedemptionItem = {
   total_inr: number | null;
   status: string;
   validity_flag: string;
-  items?: Array<{
-    product_id: string;
-    name: string | null;
-    unit_price_inr: number;
-    quantity: number;
-    gross_inr: number;
-    line_discount_inr: number | null;
-    net_inr: number | null;
-  }>;
+  source?: string;
+};
+
+type UnregisteredOrder = {
+  order_id: string;
+  promo_code: string;
+  customer_id: string;
+  used_at: string;
+  subtotal_inr: number;
+  discount_inr: number | null;
+  total_inr: number | null;
+  status: string;
+};
+
+type LiveEvent = {
+  id: string;
+  timestamp: string;
+  event: string;
+  payload: any;
 };
 
 const BUDGET = 2_500_000;
@@ -75,61 +93,11 @@ const initialCreators: Creator[] = [
   { id: 8, creator_id: "CR8", name: "Diya Malhotra", category: "Fashion", orders: 1100, discount: 10, sp: 1400, cp: 550, fee: 200000 },
 ];
 
-const money = (n: number | null | undefined) =>
-  n === null || n === undefined
-    ? "unknown"
-    : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
-
-const shortMoney = (n: number | null | undefined) => {
-  if (n === null || n === undefined) return "unknown";
-  return Math.abs(n) >= 100000
-    ? `₹${(n / 100000).toFixed(2)}L`
-    : Math.abs(n) >= 1000
-    ? `₹${(n / 1000).toFixed(1)}K`
-    : money(n);
-};
-
 function toISTISOString(d: Date): string {
   const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
   const istDate = new Date(d.getTime() + istOffsetMs);
   return istDate.toISOString().slice(0, 19) + "+05:30";
 }
-
-const formatIST = (dateStr: string | null | undefined) => {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    return (
-      new Intl.DateTimeFormat("en-IN", {
-        timeZone: "Asia/Kolkata",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      }).format(d) + " IST"
-    );
-  } catch {
-    return dateStr;
-  }
-};
-
-const formatISTDateOnly = (dateStr: string | null | undefined) => {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: "Asia/Kolkata",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(d);
-  } catch {
-    return dateStr;
-  }
-};
 
 function profit(c: Creator) {
   if (c.isLive && c.liveNetContribution !== undefined && c.liveNetContribution !== null) {
@@ -165,21 +133,29 @@ function optimize(creators: Creator[], budget: number) {
 }
 
 export default function Home() {
+  const {
+    selectedBrand,
+    brandKey,
+    agencyKey,
+    setConnectionStatus,
+    feedStatus,
+    setFeedStatus
+  } = useBrand();
+
   const [budget, setBudget] = useState(BUDGET);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [selected, setSelected] = useState<number[] | null>(null);
 
-  // Brand Auth & Multi-tenant State
-  const [selectedBrand, setSelectedBrand] = useState("B1");
-  const [brandKey, setBrandKey] = useState("b1_secret_key");
-
-  // Promo Code State
+  // Data states
   const [registeredPromos, setRegisteredPromos] = useState<RegisteredPromo[]>([]);
   const [creatorOptions, setCreatorOptions] = useState<CreatorOption[]>([]);
   const [liveCreatorMetrics, setLiveCreatorMetrics] = useState<Record<string, any>>({});
+  const [unregisteredOrders, setUnregisteredOrders] = useState<UnregisteredOrder[]>([]);
+  const [recentEvents, setRecentEvents] = useState<LiveEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Promo Code Registration Form (IST Defaults)
+  // Promo Code Registration Form
   const now = new Date();
   const plus30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const [formCode, setFormCode] = useState("");
@@ -189,101 +165,220 @@ export default function Home() {
   const [formStatusMsg, setFormStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Order Redemptions Modal / Drawer
+  // Drawer & Modal States
   const [activePromoModal, setActivePromoModal] = useState<string | null>(null);
   const [modalRedemptions, setModalRedemptions] = useState<RedemptionItem[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
-  const [simulatingOrder, setSimulatingOrder] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<RegisteredPromo | null>(null);
+  const [editValidFrom, setEditValidFrom] = useState("");
+  const [editValidTo, setEditValidTo] = useState("");
+  const [editStatusMsg, setEditStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // Fetch creator options and registered promos for brand
+  // Fetch full brand data
   const refreshBrandData = async (brandId: string, key: string) => {
     try {
+      setLoading(true);
       // 1. Fetch creators with eligibility
-      const resCreators = await fetch(`/api/creators?brand_id=${brandId}`);
-      if (resCreators.ok) {
-        const data = await resCreators.json();
-        setCreatorOptions(data);
-      }
+      try {
+        const creatorsData = await api.get<CreatorOption[]>(`/api/creators?brand_id=${brandId}`);
+        setCreatorOptions(creatorsData);
+      } catch {}
 
       // 2. Fetch registered promos
-      const resPromos = await fetch(`/api/brands/${brandId}/promo-codes`, {
-        headers: { "X-Brand-Key": key },
-      });
-      if (resPromos.ok) {
-        const promos: RegisteredPromo[] = await resPromos.json();
+      try {
+        const promos = await api.get<RegisteredPromo[]>(`/api/brands/${brandId}/promo-codes`, {
+          keyRole: "brand",
+          apiKey: key
+        });
         setRegisteredPromos(promos);
 
-        // Fetch detailed live metrics for each promo code
+        // Fetch detailed economics for each promo code
         const metricsMap: Record<string, any> = {};
         for (const p of promos) {
           try {
-            const resDetail = await fetch(`/api/brands/${brandId}/promo-codes/${p.code}`, {
-              headers: { "X-Brand-Key": key },
+            const detail = await api.get<any>(`/api/brands/${brandId}/promo-codes/${p.code}`, {
+              keyRole: "brand",
+              apiKey: key
             });
-            if (resDetail.ok) {
-              const detail = await resDetail.json();
-              if (detail.orders > 0) {
-                metricsMap[detail.creator_id] = detail;
-              }
+            if (detail.orders > 0) {
+              metricsMap[detail.creator_id] = detail;
             }
           } catch {}
         }
         setLiveCreatorMetrics(metricsMap);
-      } else {
+      } catch {
         setRegisteredPromos([]);
         setLiveCreatorMetrics({});
       }
-    } catch {
-      setRegisteredPromos([]);
+
+      // 3. Fetch Feed Status
+      try {
+        const feed = await api.get<any>(`/api/brands/${brandId}/feed-status`, {
+          keyRole: "brand",
+          apiKey: key
+        });
+        setFeedStatus(feed);
+      } catch {}
+
+      // 4. Fetch Unregistered Uses
+      try {
+        const unreg = await api.get<UnregisteredOrder[]>(`/api/brands/${brandId}/unregistered-uses`, {
+          keyRole: "brand",
+          apiKey: key
+        });
+        setUnregisteredOrders(unreg);
+      } catch {
+        setUnregisteredOrders([]);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  // SSE Stream with fetch reader
   useEffect(() => {
-    refreshBrandData(selectedBrand, brandKey);
-  }, [selectedBrand, brandKey]);
+    let isCancelled = false;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let watchdogTimer: NodeJS.Timeout | null = null;
+    let retryCount = 0;
 
-  // Handle Brand Switch
-  const handleBrandChange = (newBrand: string) => {
-    setSelectedBrand(newBrand);
-    const newKey = newBrand === "B1" ? "b1_secret_key" : "b2_secret_key";
-    setBrandKey(newKey);
-    setFormStatusMsg(null);
-  };
+    const resetWatchdog = () => {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => {
+        if (!isCancelled) {
+          console.warn("[SSE] Watchdog timeout (>35s), reconnecting...");
+          if (reader) reader.cancel().catch(() => {});
+        }
+      }, 35000);
+    };
 
-  // Submit Promo Code Registration
+    const connectSse = async () => {
+      if (isCancelled) return;
+      setConnectionStatus("connecting");
+
+      try {
+        const res = await fetch(`/api/brands/${selectedBrand}/events`, {
+          headers: {
+            "X-Brand-Key": brandKey,
+            Accept: "text/event-stream"
+          }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        setConnectionStatus("connected");
+        retryCount = 0;
+        resetWatchdog();
+
+        refreshBrandData(selectedBrand, brandKey);
+
+        const body = res.body;
+        if (!body) throw new Error("No response body");
+
+        reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!isCancelled) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          resetWatchdog();
+          buffer += decoder.decode(value, { stream: true });
+
+          const blocks = buffer.split("\n\n");
+          buffer = blocks.pop() || "";
+
+          for (const block of blocks) {
+            if (!block.trim()) continue;
+            let eventType = "message";
+            let eventData = "";
+
+            for (const rawLine of block.split("\n")) {
+              const line = rawLine.trim();
+              if (line.startsWith(":")) continue;
+              if (line.startsWith("event:")) eventType = line.slice(6).trim();
+              else if (line.startsWith("data:")) eventData = line.slice(5).trim();
+            }
+
+            if (eventType === "ping") continue;
+
+            if (eventData) {
+              try {
+                const parsed = JSON.parse(eventData);
+                const newEvent: LiveEvent = {
+                  id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  timestamp: new Date().toISOString(),
+                  event: eventType,
+                  payload: parsed
+                };
+                setRecentEvents((prev) => [newEvent, ...prev.slice(0, 19)]);
+                refreshBrandData(selectedBrand, brandKey);
+
+                if (activePromoModal && (parsed.code === activePromoModal || parsed.promo_code === activePromoModal)) {
+                  openRedemptionsModal(activePromoModal);
+                }
+              } catch (err) {
+                console.error("[SSE] JSON parse error:", err);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setConnectionStatus("disconnected");
+        }
+      } finally {
+        if (!isCancelled) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          retryCount++;
+          reconnectTimer = setTimeout(connectSse, delay);
+        }
+      }
+    };
+
+    connectSse();
+
+    const interval = setInterval(() => {
+      refreshBrandData(selectedBrand, brandKey);
+    }, 60000);
+
+    return () => {
+      isCancelled = true;
+      if (reader) reader.cancel().catch(() => {});
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      clearInterval(interval);
+    };
+  }, [selectedBrand, brandKey, activePromoModal]);
+
+  // Register Promo Code Handler
   const handleRegisterPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setFormStatusMsg(null);
 
     try {
-      const res = await fetch(`/api/brands/${selectedBrand}/promo-codes`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Brand-Key": brandKey,
-        },
-        body: JSON.stringify({
-          code: formCode.trim().toUpperCase(),
-          creator_id: formCreatorId,
-          valid_from: formValidFrom,
-          valid_to: formValidTo,
-        }),
+      const data = await api.post(`/api/brands/${selectedBrand}/promo-codes`, {
+        code: formCode.trim().toUpperCase(),
+        creator_id: formCreatorId,
+        valid_from: formValidFrom,
+        valid_to: formValidTo
+      }, {
+        keyRole: "brand",
+        apiKey: brandKey
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setFormStatusMsg({ type: "error", text: data.error || "Failed to register promo code." });
-      } else {
-        setFormStatusMsg({
-          type: "success",
-          text: `Promo code "${data.code}" successfully registered! Status: ${data.status}.`,
-        });
-        setFormCode("");
-        await refreshBrandData(selectedBrand, brandKey);
-      }
+      setFormStatusMsg({
+        type: "success",
+        text: `Promo code "${data.code}" successfully registered! Status: ${data.status}.`
+      });
+      setFormCode("");
+      await refreshBrandData(selectedBrand, brandKey);
     } catch (err: any) {
-      setFormStatusMsg({ type: "error", text: err.message || "Network error registering promo code." });
+      setFormStatusMsg({ type: "error", text: err.message || "Failed to register promo code." });
     } finally {
       setIsSubmitting(false);
     }
@@ -294,15 +389,11 @@ export default function Home() {
     setActivePromoModal(code);
     setLoadingModal(true);
     try {
-      const res = await fetch(`/api/brands/${selectedBrand}/promo-codes/${code}/redemptions`, {
-        headers: { "X-Brand-Key": brandKey },
+      const data = await api.get<RedemptionItem[]>(`/api/brands/${selectedBrand}/promo-codes/${code}/redemptions`, {
+        keyRole: "brand",
+        apiKey: brandKey
       });
-      if (res.ok) {
-        const data = await res.json();
-        setModalRedemptions(data);
-      } else {
-        setModalRedemptions([]);
-      }
+      setModalRedemptions(data || []);
     } catch {
       setModalRedemptions([]);
     } finally {
@@ -310,40 +401,35 @@ export default function Home() {
     }
   };
 
-  // Simulate Webhook Order For Demo & Testing
-  const handleSimulateOrder = async (code: string) => {
-    setSimulatingOrder(true);
+  // Edit Dates Modal Handlers
+  const openEditModal = (p: RegisteredPromo) => {
+    setEditingPromo(p);
+    setEditValidFrom(p.valid_from);
+    setEditValidTo(p.valid_to);
+    setEditStatusMsg(null);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPromo) return;
+    setIsSavingEdit(true);
+    setEditStatusMsg(null);
+
     try {
-      const sampleOrderId = `ORD-${Date.now().toString().slice(-5)}`;
-      const res = await fetch(`/api/brands/${selectedBrand}/promo-codes/${code}/redemptions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Brand-Key": brandKey,
-        },
-        body: JSON.stringify({
-          order_id: sampleOrderId,
-          customer_id: `CUST-${Math.floor(100 + Math.random() * 900)}`,
-          used_at: toISTISOString(new Date()),
-          discount_inr: 250,
-          items: [
-            { product_id: "P-101", name: "Premium Apparel", unit_price_inr: 1000, quantity: 2 },
-            { product_id: "P-102", name: "Accessories Pack", unit_price_inr: 500, quantity: 1 },
-          ],
-        }),
+      await api.patch(`/api/brands/${selectedBrand}/promo-codes/${editingPromo.code}`, {
+        valid_from: editValidFrom,
+        valid_to: editValidTo
+      }, {
+        keyRole: "brand",
+        apiKey: brandKey
       });
 
-      if (res.ok) {
-        await refreshBrandData(selectedBrand, brandKey);
-        await openRedemptionsModal(code);
-      } else {
-        const err = await res.json();
-        alert(`Simulation error: ${err.error}`);
-      }
+      setEditingPromo(null);
+      await refreshBrandData(selectedBrand, brandKey);
     } catch (err: any) {
-      alert(`Simulation error: ${err.message}`);
+      setEditStatusMsg({ type: "error", text: err.message || "Failed to update validity dates." });
     } finally {
-      setSimulatingOrder(false);
+      setIsSavingEdit(false);
     }
   };
 
@@ -384,574 +470,570 @@ export default function Home() {
       return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
     });
 
-  return (
-    <main className="min-h-screen bg-[#f6f7fb] text-slate-900">
-      {/* Side Navigation */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200 bg-white p-6 lg:block">
-        <div className="mb-10 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-xl font-bold text-white">
-            C
-          </div>
-          <div>
-            <p className="font-bold">CreatorIQ</p>
-            <p className="text-xs text-slate-500">Campaign Planner (C24)</p>
-          </div>
-        </div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Workspace</p>
-        <nav className="space-y-2">
-          <a className="block rounded-xl bg-indigo-50 px-4 py-3 font-semibold text-indigo-700" href="#overview">
-            ▦ Overview
-          </a>
-          <a className="block rounded-xl px-4 py-3 text-slate-600 hover:bg-slate-100" href="#promo-integration">
-            🏷 Promo Codes & E-Com
-          </a>
-          <a className="block rounded-xl px-4 py-3 text-slate-600 hover:bg-slate-100" href="#creators">
-            ♙ Influencer data
-          </a>
-          <a className="block rounded-xl px-4 py-3 text-slate-600 hover:bg-slate-100" href="#recommendation">
-            ✳ Best combinations
-          </a>
-          <a className="block rounded-xl px-4 py-3 text-slate-600 hover:bg-slate-100" href="#method">
-            ⌁ Calculation method
-          </a>
-        </nav>
-        <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-slate-50 p-4">
-          <p className="text-sm font-semibold">Planning budget</p>
-          <p className="mt-1 text-xl font-bold">{shortMoney(budget)}</p>
-          <p className="mt-1 text-xs text-slate-500">Maximum campaign spend</p>
-        </div>
-      </aside>
+  const hasSeedData = (feedStatus?.uses_by_source?.synthetic_seed ?? 0) > 0;
+  const noWebsiteReports = (feedStatus?.uses_by_source?.website ?? 0) === 0;
 
-      <div className="lg:pl-64">
-        {/* Top Header with Multi-Brand Switcher */}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
+  return (
+    <div className="space-y-8 p-5 sm:p-8">
+      {/* Data-Driven Banners */}
+      {hasSeedData && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+          ⚠️ <strong>Notice:</strong> Contains synthetic sample data. Observed results include pre-configured simulation runs.
+        </div>
+      )}
+
+      {noWebsiteReports && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs font-medium text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+          ℹ️ <strong>Feed Status:</strong> No website reports received yet. Orders placed on the store checkout using <code>X-Report-Key</code> will appear here automatically.
+        </div>
+      )}
+
+      {unregisteredOrders.length > 0 && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+          🚨 <strong>Integrity Alert:</strong> {unregisteredOrders.length} order(s) placed with unregistered promo codes. These are tracked under Unregistered Uses without altering creator contribution economics.
+        </div>
+      )}
+
+      {/* SECTION 1: PLANNER (#planner) */}
+      <section id="planner" className="space-y-6">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 p-6 text-white sm:p-9 shadow-xl shadow-indigo-600/10">
+          <div className="relative z-10 max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-widest text-indigo-200">
+              C24 Platform · Section 1: Planner
+            </p>
+            <h2 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
+              Spend smarter.<br />Maximize campaign contribution.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-6 text-indigo-100 sm:text-base">
+              Mathematically optimized influencer selection using integer-paise storage and authoritatively validated contribution economics.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a href="#promo-codes" className="inline-flex rounded-xl bg-white px-5 py-3 font-semibold text-indigo-700 hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-white">
+                Register Promo Code →
+              </a>
+              <a href="#experiments" className="inline-flex rounded-xl border border-white/20 bg-white/10 px-5 py-3 font-semibold text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white">
+                View Optimized Combination
+              </a>
+            </div>
+          </div>
+          <div className="pointer-events-none absolute -right-10 -top-16 h-64 w-64 rounded-full border-[35px] border-white/10" />
+        </div>
+
+        {/* Metric Overview Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Total budget" value={shortINR(budget)} subtitle="Campaign spending limit" icon="₹" />
+          <MetricCard title="Recommended spend" value={shortINR(recommendation.spend)} subtitle="Selected creator fees" icon="↗" />
+          <MetricCard title="Estimated contribution" value={shortINR(recommendation.profit)} subtitle="Authoritative C24 Net Model" icon="✳" />
+          <MetricCard title="Creators selected" value={String(chosen.length)} subtitle={`${Object.keys(liveCreatorMetrics).length} with live verified data`} icon="♙" />
+        </div>
+      </section>
+
+      {/* SECTION 2: FINDER (#finder) */}
+      <section id="finder" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-800">
           <div>
-            <p className="text-sm text-slate-500">Marketing / Creator campaigns (Case C24)</p>
-            <h1 className="mt-1 text-xl font-bold sm:text-2xl">Campaign overview</h1>
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+              Section 2: Finder
+            </span>
+            <h2 className="mt-2 text-xl font-bold">Influencer Roster & Agency Catalog</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Discover eligible creators, review rival brand conflicts, and select collaborators for your plan.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold">
-              <span className="text-slate-500">Active Brand:</span>
-              <select
-                value={selectedBrand}
-                onChange={(e) => handleBrandChange(e.target.value)}
-                className="bg-transparent font-bold text-indigo-700 outline-none"
-              >
-                <option value="B1">B1 · Brand Nova</option>
-                <option value="B2">B2 · Brand Zenith</option>
-              </select>
-            </div>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-              ● Planning & Tracking Mode
-            </span>
+            <input
+              type="text"
+              placeholder="Search creator name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+            />
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+            >
+              {["All", "Fashion", "Beauty", "Lifestyle", "Fitness", "Technology"].map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
-        </header>
-
-        {/* Fixed Synthetic Data Notice Banner */}
-        <div className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-900 sm:px-8">
-          ⚠️ <strong>Notice:</strong> Website not connected yet. All use data shown is synthetic sample data. Returns: not available (not tracked by this service).
         </div>
 
-        <div className="space-y-8 p-5 sm:p-8">
-          {/* Hero Banner */}
-          <section id="overview" className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 p-6 text-white sm:p-9">
-            <div className="relative z-10 max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-widest text-indigo-200">
-                Creator campaign contribution planner
-              </p>
-              <h2 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
-                Spend smarter.<br />Maximize campaign contribution.
-              </h2>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-indigo-100 sm:text-base">
-                Register influencer promo codes and capture actual e-commerce checkout data to observe true campaign retained sales and pre-fee contribution.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <a href="#promo-integration" className="inline-flex rounded-xl bg-white px-5 py-3 font-semibold text-indigo-700 hover:bg-indigo-50">
-                  Register Promo Code →
-                </a>
-                <a href="#recommendation" className="inline-flex rounded-xl border border-white/20 bg-white/10 px-5 py-3 font-semibold text-white hover:bg-white/20">
-                  View Optimized Plan
-                </a>
-              </div>
-            </div>
-            <div className="pointer-events-none absolute -right-10 -top-16 h-64 w-64 rounded-full border-[35px] border-white/10" />
-          </section>
-
-          {/* Metric Cards */}
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric title="Total budget" value={shortMoney(budget)} subtitle="Campaign spending limit" icon="₹" />
-            <Metric title="Recommended spend" value={shortMoney(recommendation.spend)} subtitle="Selected creator fees" icon="↗" />
-            <Metric title="Estimated contribution" value={shortMoney(recommendation.profit)} subtitle="Authoritative C24 Net Model" icon="✳" />
-            <Metric title="Creators selected" value={String(chosen.length)} subtitle={`${Object.keys(liveCreatorMetrics).length} with live verified data`} icon="♙" />
-          </section>
-
-          {/* PART 1 & 2: PROMO CODE INTEGRATION & REGISTRATION CARD */}
-          <section id="promo-integration" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
-              <div>
-                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-                  Brand Data Integration
-                </span>
-                <h2 className="mt-2 text-xl font-bold">Register Influencer Promo Code</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Register promo codes dedicated to specific creators. Status is derived from validity dates and system clock.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">X-Brand-Key:</span>
-                <input
-                  type="password"
-                  value={brandKey}
-                  onChange={(e) => setBrandKey(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-1 text-xs outline-none focus:border-indigo-500"
-                  placeholder="Brand API Key"
-                />
-              </div>
-            </div>
-
-            {formStatusMsg && (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {shown.map((c) => {
+            const isSelected = activeIds.includes(c.id);
+            return (
               <div
-                className={`mt-4 rounded-xl p-4 text-sm ${
-                  formStatusMsg.type === "success"
-                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border border-rose-200 bg-rose-50 text-rose-800"
+                key={c.id}
+                onClick={() => toggle(c.id)}
+                className={`cursor-pointer rounded-2xl border p-5 transition-all focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                  isSelected
+                    ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-600/20 dark:border-indigo-500 dark:bg-indigo-950/30"
+                    : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/60"
                 }`}
               >
-                {formStatusMsg.text}
-              </div>
-            )}
-
-            <form onSubmit={handleRegisterPromo} className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Promo Code *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. AARAV10"
-                  value={formCode}
-                  onChange={(e) => setFormCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold uppercase outline-none focus:border-indigo-500"
-                />
-                <p className="mt-1 text-[11px] text-slate-400">4–20 alphanumeric, no spaces.</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Assigned Influencer *
-                </label>
-                <select
-                  value={formCreatorId}
-                  onChange={(e) => setFormCreatorId(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500"
-                >
-                  {creatorOptions.map((opt) => (
-                    <option key={opt.creator_id} value={opt.creator_id} disabled={!opt.eligible}>
-                      {opt.creator_id} - {opt.name} ({opt.category}) {!opt.eligible ? `[Blocked: ${opt.eligibility_reason}]` : ""}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-slate-400">Enforces rival brand conflict check.</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Valid From (IST) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formValidFrom}
-                  onChange={(e) => setFormValidFrom(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono outline-none focus:border-indigo-500"
-                />
-                <p className="mt-1 text-[11px] text-slate-400">Indian Standard Time (+05:30)</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Valid To (IST) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formValidTo}
-                  onChange={(e) => setFormValidTo(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono outline-none focus:border-indigo-500"
-                />
-                <p className="mt-1 text-[11px] text-slate-400">Indian Standard Time (+05:30)</p>
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-4">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {isSubmitting ? "Registering..." : "Submit / Register Promo Code"}
-                </button>
-              </div>
-            </form>
-
-            {/* Registered Codes Table */}
-            <div className="mt-8">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-                Registered Promo Codes ({registeredPromos.length})
-              </h3>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                      <th className="py-3">Code</th>
-                      <th className="py-3">Creator</th>
-                      <th className="py-3">Validity Window</th>
-                      <th className="py-3">Status</th>
-                      <th className="py-3 text-right">Uses</th>
-                      <th className="py-3 text-right">Reported Discount</th>
-                      <th className="py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registeredPromos.map((p) => (
-                      <tr key={p.code} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="py-3 font-mono font-bold text-indigo-700">{p.code}</td>
-                        <td className="py-3">{p.creator_id}</td>
-                        <td className="py-3 text-xs text-slate-500">
-                          {formatISTDateOnly(p.valid_from)} to {formatISTDateOnly(p.valid_to)} IST
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              p.status === "valid"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : p.status === "not_yet_valid"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-rose-50 text-rose-700"
-                            }`}
-                          >
-                            ● {p.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right font-semibold">{p.use_count}</td>
-                        <td className="py-3 text-right font-medium text-slate-600">
-                          {p.discount_inr !== null ? money(p.discount_inr) : "unknown"}
-                        </td>
-                        <td className="py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => openRedemptionsModal(p.code)}
-                              className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold hover:bg-slate-100"
-                            >
-                              View Orders
-                            </button>
-                            <button
-                              onClick={() => handleSimulateOrder(p.code)}
-                              disabled={simulatingOrder}
-                              className="rounded-lg bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-                            >
-                              + Simulate Order
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {registeredPromos.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="py-6 text-center text-slate-400">
-                          No promo codes registered for this brand yet. Register one above to track checkout uses.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-
-          {/* Recommendation & Plan Summary */}
-          <section id="recommendation" className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-indigo-600">Optimization result</p>
-                  <h2 className="mt-1 text-xl font-bold">Recommended combination</h2>
-                  <p className="mt-1 text-sm text-slate-500">Select or remove creators to test alternatives.</p>
-                </div>
-                <button onClick={() => setSelected(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">
-                  Reset recommendation
-                </button>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {chosen.length === 0 && (
-                  <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                    Select creators from the table below to build a plan.
-                  </p>
-                )}
-                {chosen.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 font-bold text-indigo-700">
-                        {c.name.split(" ").map((n) => n[0]).join("")}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{c.name}</p>
-                          {c.isLive ? (
-                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                              LIVE ACTUALS
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                              SIMULATED
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          {c.category} · {c.isLive ? `${c.liveOrders} live orders` : `${c.orders.toLocaleString("en-IN")} tracked orders`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-semibold ${profit(c) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                        {shortMoney(profit(c))}
-                      </p>
-                      <p className="text-xs text-slate-500">Estimated contribution</p>
-                    </div>
+                <div className="flex items-start justify-between">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    {c.name.split(" ").map((n) => n[0]).join("")}
                   </div>
-                ))}
-              </div>
-
-              <div className="mt-5 rounded-xl bg-slate-50 p-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Budget used</span>
-                  <span className="font-semibold">{budget ? ((spend / budget) * 100).toFixed(1) : "0.0"}%</span>
-                </div>
-                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className={`h-full rounded-full ${spend > budget ? "bg-rose-500" : "bg-indigo-600"}`}
-                    style={{ width: `${Math.min(100, budget ? (spend / budget) * 100 : 0)}%` }}
-                  />
-                </div>
-                <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm">
-                  <span className="text-slate-500">Spend: {money(spend)}</span>
-                  <span className={spend > budget ? "font-semibold text-rose-600" : "font-semibold text-emerald-700"}>
-                    {spend > budget ? `Over budget by ${money(spend - budget)}` : `Remaining: ${money(budget - spend)}`}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                  }`}>
+                    {isSelected ? "Selected" : "Excluded"}
                   </span>
                 </div>
+                <div className="mt-4">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold">{c.name}</p>
+                    {c.isLive && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {c.category} · {c.creator_id || "Unregistered"}
+                  </p>
+                </div>
+                <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Orders:</span>
+                    <span className="font-semibold">{c.isLive ? c.liveOrders : c.orders.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Creator fee:</span>
+                    <span className="font-semibold">{formatINR(c.fee)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Contribution:</span>
+                    <span className={`font-semibold ${profit(c) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                      {formatINR(profit(c))}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Summary Row Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-              <h2 className="text-xl font-bold">Plan summary</h2>
-              <p className="mt-1 text-sm text-slate-500">Results for your selected combination.</p>
-              <div className="mt-6 rounded-2xl bg-emerald-50 p-5">
-                <p className="text-sm font-medium text-emerald-800">Estimated total net contribution</p>
-                <p className={`mt-2 text-3xl font-bold ${totalProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                  {money(totalProfit)}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-emerald-800">
-                  Applies the authoritative C24 contribution model with live order integration when available.
-                </p>
-              </div>
-              <div className="mt-5 space-y-4">
-                <SummaryRow label="Creators selected" value={String(chosen.length)} />
-                <SummaryRow label="Tracked orders (sum)" value={orders.toLocaleString("en-IN")} />
-                <SummaryRow label="Total creator fees" value={money(spend)} />
-                <SummaryRow label="Budget remaining" value={money(budget - spend)} />
-                <SummaryRow label="Contribution per ₹1 spent" value={spend > 0 ? `₹${(totalProfit / spend).toFixed(2)}` : "—"} />
-              </div>
-              {spend > budget && (
-                <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
-                  This plan exceeds the budget. Remove one or more creators.
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Influencer Performance Table with Data Provenance Column */}
-          <section id="creators" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold">Influencer performance</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Baseline historical fixtures conditionally updated with live observed promo orders.
-                </p>
-              </div>
-              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search creators..."
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500"
-                />
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500"
-                >
-                  <option>All</option>
-                  <option>Lifestyle</option>
-                  <option>Fashion</option>
-                  <option>Technology</option>
-                  <option>Beauty</option>
-                  <option>Fitness</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-3 py-4">Select</th>
-                    <th className="px-3 py-4">Influencer</th>
-                    <th className="px-3 py-4">Data Source</th>
-                    <th className="px-3 py-4 text-right">Orders</th>
-                    <th className="px-3 py-4 text-right">Discount</th>
-                    <th className="px-3 py-4 text-right">Avg. SP / AOV</th>
-                    <th className="px-3 py-4 text-right">Creator fee</th>
-                    <th className="px-3 py-4 text-right">Retained Sales</th>
-                    <th className="px-3 py-4 text-right">Net Contribution</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((c) => (
-                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-3 py-4">
-                        <input
-                          type="checkbox"
-                          checked={activeIds.includes(c.id)}
-                          onChange={() => toggle(c.id)}
-                          aria-label={`Select ${c.name}`}
-                          className="h-4 w-4 accent-indigo-600"
-                        />
-                      </td>
-                      <td className="px-3 py-4">
-                        <p className="font-semibold">{c.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {c.creator_id ? `[${c.creator_id}] ` : ""}
-                          {c.category}
-                        </p>
-                      </td>
-                      <td className="px-3 py-4">
-                        {c.isLive ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Live Observed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
-                            Simulated Scenario
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-4 text-right">
-                        {c.isLive ? `${c.liveOrders} (${c.liveReturns} ret)` : c.orders.toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-3 py-4 text-right">
-                        {c.isLive
-                          ? c.liveDiscountPct !== null
-                            ? `${c.liveDiscountPct.toFixed(1)}% (derived)`
-                            : "unknown"
-                          : `${c.discount}%`}
-                      </td>
-                      <td className="px-3 py-4 text-right">
-                        {c.isLive && c.liveAov !== null ? money(c.liveAov) : money(c.sp)}
-                      </td>
-                      <td className="px-3 py-4 text-right">{shortMoney(c.fee)}</td>
-                      <td className="px-3 py-4 text-right font-medium">
-                        {c.isLive ? money(c.liveRetainedSales) : "—"}
-                      </td>
-                      <td className={`px-3 py-4 text-right font-semibold ${profit(c) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                        {shortMoney(profit(c))}
-                      </td>
-                    </tr>
-                  ))}
-                  {shown.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-10 text-center text-slate-500">
-                        No influencers match your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-4 text-xs leading-5 text-slate-500">
-              * Note: When a creator has 0 live promo orders, the table preserves existing baseline planning figures.
-            </p>
-          </section>
-
-          {/* Methodology Explanations */}
-          <section id="method" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
-            <h2 className="font-bold text-amber-950">How the C24 Calculation Model Works</h2>
-            <p className="mt-2 text-sm leading-6 text-amber-900">
-              <strong>Retained Sales:</strong> (Orders − Returns) × Discounted AOV.<br />
-              <strong>Pre-Fee Contribution:</strong> Retained Sales × (Pre-fee Contribution % / 100). Includes variable product and delivery costs in margin.<br />
-              <strong>Incremental Contribution:</strong> (Pre-fee Contribution × Incremental Share Assumption) − Creator Fee.<br />
-              <strong>Break-Even Share:</strong> Creator Fee / Pre-Fee Contribution (returns null if pre-fee contribution is zero or negative).
-            </p>
-            <p className="mt-3 text-sm leading-6 text-amber-900">
-              <strong>Data Integrity Convention:</strong> Missing values are strictly treated as UNKNOWN (null), never silently converted into zero.
-            </p>
-          </section>
-
-          <footer className="pb-4 text-center text-xs text-slate-400">
-            CreatorIQ · Creator Campaign Contribution Planner · Case C24 · Synthetic reference data
-          </footer>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      {/* Redemptions Order Audit Modal / Drawer */}
+      {/* SECTION 3: PROMO CODES (#promo-codes) */}
+      <section id="promo-codes" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-800">
+          <div>
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+              Section 3: Promo Codes
+            </span>
+            <h2 className="mt-2 text-xl font-bold">Register Influencer Promo Code</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Assign codes to creators with strict validity windows. Status is automatically derived from the system clock.
+            </p>
+          </div>
+          <span className="font-mono text-xs text-slate-400">Authorized: X-Brand-Key</span>
+        </div>
+
+        {formStatusMsg && (
+          <div className={`mt-4 rounded-xl p-4 text-sm ${
+            formStatusMsg.type === "success"
+              ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "border border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+          }`}>
+            {formStatusMsg.text}
+          </div>
+        )}
+
+        <form onSubmit={handleRegisterPromo} className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Promo Code (Uppercase)</label>
+            <input
+              type="text"
+              placeholder="e.g. AARAV10"
+              value={formCode}
+              onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+              required
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono font-bold outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Assigned Creator</label>
+            <select
+              value={formCreatorId}
+              onChange={(e) => setFormCreatorId(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+            >
+              {creatorOptions.map((c) => (
+                <option key={c.creator_id} value={c.creator_id} disabled={!c.eligible}>
+                  {c.name} ({c.creator_id}) {!c.eligible ? `· Blocked (${c.eligibility_reason})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Valid From (IST)</label>
+            <input
+              type="text"
+              value={formValidFrom}
+              onChange={(e) => setFormValidFrom(e.target.value)}
+              required
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Valid To (IST)</label>
+            <input
+              type="text"
+              value={formValidTo}
+              onChange={(e) => setFormValidTo(e.target.value)}
+              required
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+            />
+          </div>
+          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl bg-indigo-600 px-6 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              {isSubmitting ? "Registering..." : "+ Register Promo Code"}
+            </button>
+          </div>
+        </form>
+
+        {/* Registered Codes Table */}
+        <div className="mt-8 border-t border-slate-100 pt-6 dark:border-slate-800">
+          <h3 className="text-lg font-bold">Registered Promo Codes ({registeredPromos.length})</h3>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-700">
+                  <th className="py-3">Code</th>
+                  <th className="py-3">Creator</th>
+                  <th className="py-3">Validity Window</th>
+                  <th className="py-3">Status</th>
+                  <th className="py-3 text-right">Uses</th>
+                  <th className="py-3 text-right">Reported Discount</th>
+                  <th className="py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {registeredPromos.map((p) => (
+                  <tr key={p.code} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                    <td className="py-3 font-mono font-bold text-indigo-700 dark:text-indigo-400">{p.code}</td>
+                    <td className="py-3">{p.creator_id}</td>
+                    <td className="py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {formatISTDateOnly(p.valid_from)} to {formatISTDateOnly(p.valid_to)} IST
+                    </td>
+                    <td className="py-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        p.status === "valid"
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                          : p.status === "not_yet_valid"
+                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                          : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
+                      }`}>
+                        ● {p.status}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right font-semibold">{p.use_count}</td>
+                    <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-300">
+                      {formatINR(p.discount_inr)}
+                    </td>
+                    <td className="py-3 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(p)}
+                          className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          Edit Dates
+                        </button>
+                        <button
+                          onClick={() => openRedemptionsModal(p.code)}
+                          className="rounded-lg bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300"
+                        >
+                          View Orders
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {registeredPromos.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No promo codes registered for this brand yet. Register one above to begin tracking live checkout redemptions.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: LIVE FEED (#live-feed) */}
+      <section id="live-feed" className="rounded-2xl border border-slate-200 bg-slate-900 p-5 sm:p-6 text-white dark:border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <h3 className="font-bold text-sm text-slate-100">Section 4: Live Ingestion Event Stream</h3>
+          </div>
+          <span className="text-xs text-slate-400">Streamed via fetch + ReadableStream (X-Brand-Key)</span>
+        </div>
+        <div className="mt-3 max-h-56 space-y-2 overflow-y-auto font-mono text-xs">
+          {recentEvents.length === 0 ? (
+            <p className="py-8 text-center text-slate-500">
+              Awaiting live checkout orders or events from the website / simulator...
+            </p>
+          ) : (
+            recentEvents.map((ev) => (
+              <div key={ev.id} className="flex items-start justify-between gap-3 rounded-xl bg-slate-800/80 p-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                    ev.event === "use_recorded"
+                      ? "border border-emerald-800 bg-emerald-950 text-emerald-400"
+                      : ev.event === "unregistered_use_recorded"
+                      ? "border border-amber-800 bg-amber-950 text-amber-400"
+                      : ev.event === "promo_created"
+                      ? "border border-indigo-800 bg-indigo-950 text-indigo-400"
+                      : "border border-cyan-800 bg-cyan-950 text-cyan-400"
+                  }`}>
+                    {ev.event}
+                  </span>
+                  <span className="font-bold text-slate-200">{renderOrUnknown(ev.payload.code || ev.payload.promo_code)}</span>
+                  {ev.payload.order_id && <span className="text-slate-400 text-[11px]">[{ev.payload.order_id}]</span>}
+                  {ev.payload.discount_inr !== undefined && (
+                    <span className="text-emerald-400 text-[11px]">disc: {formatINR(ev.payload.discount_inr)}</span>
+                  )}
+                  {ev.payload.source && (
+                    <span className="rounded bg-slate-700 px-1 py-0.2 text-[9px] text-slate-300">{ev.payload.source}</span>
+                  )}
+                </div>
+                <span className="shrink-0 text-[10px] text-slate-500">{formatIST(ev.timestamp)}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* SECTION 5: COST PER UNIT (#cost-per-unit) */}
+      <section id="cost-per-unit" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+          Section 5: Cost Per Unit
+        </span>
+        <h2 className="mt-2 text-xl font-bold">Creator Unit Economics & Fee Allocation</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Authoritative fee allocation across gross merchandise units. Cost per unit basis is strictly &ldquo;returns not deducted&rdquo;.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-700">
+                <th className="py-3">Code</th>
+                <th className="py-3">Creator</th>
+                <th className="py-3 text-right">Fee (Paise Converted)</th>
+                <th className="py-3 text-right">Units Sold</th>
+                <th className="py-3 text-right">Cost / Unit</th>
+                <th className="py-3 text-right">Basis</th>
+              </tr>
+            </thead>
+            <tbody>
+              {registeredPromos.map((p) => (
+                <tr key={p.code} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                  <td className="py-3 font-mono font-bold text-indigo-700 dark:text-indigo-400">{p.code}</td>
+                  <td className="py-3">{p.creator_id}</td>
+                  <td className="py-3 text-right font-medium">{formatINR(p.creator_fee)}</td>
+                  <td className="py-3 text-right font-semibold">{p.units !== undefined ? p.units : "—"}</td>
+                  <td className="py-3 text-right font-bold text-slate-900 dark:text-slate-100">
+                    {p.cost_per_unit_status === "ok" && p.cost_per_unit !== null
+                      ? formatINRWithPaise(p.cost_per_unit)
+                      : p.cost_per_unit_status === "no_units"
+                      ? "no units"
+                      : p.cost_per_unit_status === "fee_unknown"
+                      ? "fee unknown"
+                      : "unknown"}
+                  </td>
+                  <td className="py-3 text-right text-xs text-slate-500 dark:text-slate-400">returns not deducted</td>
+                </tr>
+              ))}
+              {registeredPromos.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-slate-400">
+                    No active campaign data to calculate unit costs yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* SECTION 6: EXPERIMENTS (#experiments) */}
+      <section id="experiments" className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                Section 6: Experiments
+              </span>
+              <h2 className="mt-2 text-xl font-bold">Scenario Modeling & Combination Testing</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Include or exclude creators to observe impact on net contribution.</p>
+            </div>
+            <button onClick={() => setSelected(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+              Reset recommendation
+            </button>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {chosen.length === 0 && (
+              <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                Select creators from the roster above to test a scenario combination.
+              </p>
+            )}
+            {chosen.map((c) => (
+              <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-800">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                    {c.name.split(" ").map((n) => n[0]).join("")}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{c.name}</p>
+                      {c.isLive ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                          LIVE ACTUALS
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          SIMULATED
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {c.category} · {c.isLive ? `${c.liveOrders} live orders` : `${c.orders.toLocaleString("en-IN")} tracked orders`}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`font-semibold ${profit(c) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                    {shortINR(profit(c))}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Estimated contribution</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500 dark:text-slate-400">Budget utilized</span>
+              <span className="font-semibold">{budget ? ((spend / budget) * 100).toFixed(1) : "0.0"}%</span>
+            </div>
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+              <div
+                className={`h-full rounded-full ${spend > budget ? "bg-rose-500" : "bg-indigo-600"}`}
+                style={{ width: `${Math.min(100, budget ? (spend / budget) * 100 : 0)}%` }}
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm">
+              <span className="text-slate-500 dark:text-slate-400">Spend: {formatINR(spend)}</span>
+              <span className={spend > budget ? "font-semibold text-rose-600 dark:text-rose-400" : "font-semibold text-emerald-600 dark:text-emerald-400"}>
+                {spend > budget ? `Over budget by ${formatINR(spend - budget)}` : `Remaining: ${formatINR(budget - spend)}`}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Experiment Results Card */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-xl font-bold">Plan summary</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Optimized mathematical solution.</p>
+          <div className="mt-6 rounded-2xl bg-emerald-50 p-5 dark:bg-emerald-950/40">
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Estimated total net contribution</p>
+            <p className={`mt-2 text-3xl font-bold ${totalProfit >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+              {formatINR(totalProfit)}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-emerald-800 dark:text-emerald-400">
+              C24 Authoritative Contribution Model with integer paise precision.
+            </p>
+          </div>
+          <div className="mt-5 space-y-4">
+            <SummaryRow label="Creators selected" value={String(chosen.length)} />
+            <SummaryRow label="Total campaign spend" value={formatINR(spend)} />
+            <SummaryRow label="Target orders" value={orders.toLocaleString("en-IN")} />
+            <SummaryRow label="ROAS / Return multiple" value={`${spend ? (totalProfit / spend).toFixed(2) : "0.00"}x`} />
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 7: EVIDENCE (#evidence) */}
+      <section id="evidence" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+          Section 7: Evidence
+        </span>
+        <h2 className="mt-2 text-xl font-bold">Contribution Calculation Formulation & Returns Attribution</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Formulation rules implemented in the backend, accounting for partial refunds and cancellations.
+        </p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+            <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Retained Sales</p>
+            <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+              <code>retained_orders = eligible_orders - full_returns</code><br />
+              <code>sales = (retained_orders × aov × (1 - discount)) - partial_refunds</code>
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+            <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Pre-Fee Contribution</p>
+            <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+              <code>pre_fee_contrib = retained_sales × margin_pct</code>
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+            <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Net Contribution</p>
+            <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+              <code>net_contrib = pre_fee_contrib - creator_fee</code>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Redemptions Order Audit Drawer */}
       {activePromoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 dark:border dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-                  E-Commerce Attribution Audit
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                  Order Audit Trail
                 </span>
-                <h3 className="text-xl font-bold">
-                  Order Redemptions for <span className="font-mono text-indigo-700">{activePromoModal}</span>
+                <h3 className="mt-2 text-xl font-bold">
+                  Redemptions for Promo Code: <span className="font-mono text-indigo-700 dark:text-indigo-400">{activePromoModal}</span>
                 </h3>
               </div>
               <button
                 onClick={() => setActivePromoModal(null)}
-                className="rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200"
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-4 text-xs">
-              <div>
-                <p className="font-semibold text-slate-700">Privacy & Integrity Rules:</p>
-                <p className="text-slate-500">Customer PII (names, emails, phones, addresses) is completely excluded.</p>
-              </div>
-              <button
-                onClick={() => handleSimulateOrder(activePromoModal)}
-                disabled={simulatingOrder}
-                className="rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {simulatingOrder ? "Simulating..." : "+ Simulate Webhook Order (₹250 disc)"}
-              </button>
+            <div className="mt-4 rounded-xl bg-slate-50 p-4 text-xs dark:bg-slate-800/50">
+              <p className="font-semibold text-slate-700 dark:text-slate-300">Privacy & Integrity Rules:</p>
+              <p className="text-slate-500 dark:text-slate-400">Customer PII is strictly excluded. Stored with integer paise precision.</p>
             </div>
 
             {loadingModal ? (
-              <p className="py-12 text-center text-sm text-slate-500">Loading order audit trail...</p>
+              <p className="py-12 text-center text-sm text-slate-500">Loading audit trail...</p>
             ) : (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 uppercase text-slate-500">
+                    <tr className="border-b border-slate-200 uppercase text-slate-500 dark:border-slate-700">
                       <th className="py-3">Order ID</th>
                       <th className="py-3">Customer ID</th>
                       <th className="py-3">Timestamp</th>
                       <th className="py-3">Validity</th>
-                      <th className="py-3">Status</th>
                       <th className="py-3 text-right">Subtotal</th>
                       <th className="py-3 text-right">Discount</th>
                       <th className="py-3 text-right">Basis</th>
@@ -960,30 +1042,27 @@ export default function Home() {
                   </thead>
                   <tbody>
                     {modalRedemptions.map((o) => (
-                      <tr key={o.order_id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="py-3 font-mono font-bold">{o.order_id}</td>
-                        <td className="py-3 font-mono text-slate-500">{o.customer_id}</td>
-                        <td className="py-3 text-slate-600 font-medium">{formatIST(o.used_at)}</td>
+                      <tr key={o.order_id} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                        <td className="py-3 font-mono font-bold">{renderOrUnknown(o.order_id)}</td>
+                        <td className="py-3 font-mono text-slate-500 dark:text-slate-400">{renderOrUnknown(o.customer_id)}</td>
+                        <td className="py-3 text-slate-600 dark:text-slate-300">{formatIST(o.used_at)}</td>
                         <td className="py-3">
-                          <span
-                            className={`rounded-full px-2 py-0.5 font-semibold ${
-                              o.validity_flag === "valid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                            }`}
-                          >
+                          <span className={`rounded-full px-2 py-0.5 font-semibold ${
+                            o.validity_flag === "valid" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                          }`}>
                             {o.validity_flag}
                           </span>
                         </td>
-                        <td className="py-3 font-semibold text-slate-700">{o.status}</td>
-                        <td className="py-3 text-right">{money(o.subtotal_inr)}</td>
-                        <td className="py-3 text-right">{o.discount_inr !== null ? money(o.discount_inr) : "unknown"}</td>
-                        <td className="py-3 text-right text-slate-500">{o.discount_basis || "none"}</td>
-                        <td className="py-3 text-right font-bold">{o.total_inr !== null ? money(o.total_inr) : "unknown"}</td>
+                        <td className="py-3 text-right">{formatINR(o.subtotal_inr)}</td>
+                        <td className="py-3 text-right">{formatINR(o.discount_inr)}</td>
+                        <td className="py-3 text-right text-slate-500">{renderOrUnknown(o.discount_basis)}</td>
+                        <td className="py-3 text-right font-bold">{formatINR(o.total_inr)}</td>
                       </tr>
                     ))}
                     {modalRedemptions.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="py-8 text-center text-slate-400">
-                          No order redemptions recorded for this promo code yet. Click "+ Simulate Webhook Order" above to test live order processing!
+                        <td colSpan={8} className="py-8 text-center text-slate-400">
+                          No order redemptions recorded for this promo code yet.
                         </td>
                       </tr>
                     )}
@@ -994,29 +1073,93 @@ export default function Home() {
           </div>
         </div>
       )}
-    </main>
+
+      {/* Edit Validity Dates Modal */}
+      {editingPromo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900 dark:border dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold">Edit Validity Window</h3>
+                <p className="text-xs text-slate-500">
+                  Promo Code: <span className="font-mono font-bold text-indigo-700 dark:text-indigo-400">{editingPromo.code}</span>
+                </p>
+              </div>
+              <button onClick={() => setEditingPromo(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">✕</button>
+            </div>
+
+            {editStatusMsg && (
+              <div className={`mt-4 rounded-xl p-3 text-xs ${
+                editStatusMsg.type === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+              }`}>
+                {editStatusMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Valid From (ISO with Timezone):</label>
+                <input
+                  type="text"
+                  value={editValidFrom}
+                  onChange={(e) => setEditValidFrom(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Valid To (ISO with Timezone):</label>
+                <input
+                  type="text"
+                  value={editValidTo}
+                  onChange={(e) => setEditValidTo(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingPromo(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isSavingEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-function Metric({ title, value, subtitle, icon }: { title: string; value: string; subtitle: string; icon: string }) {
+function MetricCard({ title, value, subtitle, icon }: { title: string; value: string; subtitle: string; icon: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between">
-        <p className="text-sm text-slate-500">{title}</p>
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 font-bold text-indigo-700">
+        <p className="text-sm text-slate-500 dark:text-slate-400">{title}</p>
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
           {icon}
         </span>
       </div>
       <p className="mt-4 text-2xl font-bold tracking-tight">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
     </div>
   );
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 text-sm last:border-0">
-      <span className="text-slate-500">{label}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 text-sm last:border-0 dark:border-slate-800">
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
       <span className="text-right font-semibold">{value}</span>
     </div>
   );

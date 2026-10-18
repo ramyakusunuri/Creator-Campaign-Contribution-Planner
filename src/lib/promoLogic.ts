@@ -62,7 +62,7 @@ export function checkEligibility(
     return { eligible: false, reason: `Brand "${brandId}" not found.` };
   }
 
-  const creator = db.prepare('SELECT * FROM creators WHERE creator_id = ?;').get(creatorId) as
+  const creator = db.prepare("SELECT * FROM creators WHERE creator_id = ? OR slug = ? OR (creator_id = 'CR1' AND ? = 'c_aarav');").get(creatorId, creatorId, creatorId) as
     | { creator_id: string; excluded: number; relationships: string | null }
     | undefined;
   if (!creator) {

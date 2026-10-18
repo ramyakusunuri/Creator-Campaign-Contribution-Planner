@@ -14,6 +14,15 @@ import {
   validateOrderPayload
 } from './promo.js';
 import { canonicalHash, fromPaise } from './storage/interface.js';
+import { calculateCreatorCostPerUnit } from './lib/costPerUnit.js';
+import {
+  parseCreatorUrl,
+  parseBatchUrls,
+  parseAndValidateCsv,
+  rankCreators,
+  checkShortlistEligibility,
+  DEFAULT_TIER_SETTINGS
+} from './lib/finder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +40,7 @@ function timingSafeMatch(provided, expected) {
 
 export function createApp({
   storage = null,
+  sse = null,
   dbPath = path.join(ROOT_DIR, 'data', 'promo.db'),
   appEnv = process.env.APP_ENV || 'demo',
   brandsFilePath = path.join(ROOT_DIR, 'data', 'brands.json'),
@@ -38,7 +48,7 @@ export function createApp({
   publicDir = path.join(ROOT_DIR, 'public')
 } = {}) {
   const store = storage || new SqliteStorage(dbPath, appEnv);
-  const sseHub = new SseHub();
+  const sseHub = sse || new SseHub();
 
   // Load brands and creators
   let brandsData = [];
@@ -111,6 +121,34 @@ export function createApp({
     sendJson(res, status, { error: err.message });
   }
 
+  const agencyKeys = (appEnv === 'production')
+    ? (process.env.AGENCY_KEY ? [process.env.AGENCY_KEY] : [])
+    : ['demo-agency-key', 'agency_secret_master'];
+
+  function authenticateAgency(req) {
+    const agencyKeyHeader = req.headers['x-agency-key'];
+    const brandKeyHeader = req.headers['x-brand-key'];
+    const reportKeyHeader = req.headers['x-report-key'];
+
+    if ((brandKeyHeader || reportKeyHeader) && !agencyKeyHeader) {
+      const err = new Error('Forbidden: Agency key required on agency endpoints');
+      err.status = 403;
+      throw err;
+    }
+    if (!agencyKeyHeader) {
+      const err = new Error('Unauthorized: Missing X-Agency-Key header');
+      err.status = 401;
+      throw err;
+    }
+    const isValid = agencyKeys.some(k => timingSafeMatch(agencyKeyHeader, k));
+    if (!isValid) {
+      const err = new Error('Forbidden: Invalid X-Agency-Key');
+      err.status = 403;
+      throw err;
+    }
+    return true;
+  }
+
   // Authentication check helper
   function authenticate(req, brandId, allowedTypes = ['brand']) {
     const brand = getBrand(brandId);
@@ -122,17 +160,31 @@ export function createApp({
 
     const brandKeyHeader = req.headers['x-brand-key'];
     const reportKeyHeader = req.headers['x-report-key'];
+    const agencyKeyHeader = req.headers['x-agency-key'];
 
     const hasBrandKey = timingSafeMatch(brandKeyHeader, brand.api_key);
     const hasReportKey = timingSafeMatch(reportKeyHeader, brand.report_key);
+    const hasAgencyKey = agencyKeys.some(k => timingSafeMatch(agencyKeyHeader, k));
+
+    if (allowedTypes.includes('agency') && hasAgencyKey) {
+      return 'agency';
+    }
 
     if (allowedTypes.includes('brand') && !allowedTypes.includes('report')) {
-      if (reportKeyHeader && !hasBrandKey) {
+      if (reportKeyHeader && !hasBrandKey && !hasAgencyKey) {
         const err = new Error('Forbidden: X-Report-Key not permitted on brand endpoints');
         err.status = 403;
         throw err;
       }
-      if (!hasBrandKey) {
+      if (brandKeyHeader && !hasBrandKey) {
+        const otherBrand = brandsData.find(b => timingSafeMatch(brandKeyHeader, b.api_key));
+        if (otherBrand && otherBrand.brand_id !== brandId) {
+          const err = new Error(`Forbidden: Key belongs to brand "${otherBrand.brand_id}", but requested brand is "${brandId}"`);
+          err.status = 403;
+          throw err;
+        }
+      }
+      if (!hasBrandKey && !(allowedTypes.includes('agency') && hasAgencyKey)) {
         const err = new Error('Unauthorized: Valid X-Brand-Key header required');
         err.status = 401;
         throw err;
@@ -141,8 +193,8 @@ export function createApp({
     }
 
     if (allowedTypes.includes('report') && !allowedTypes.includes('brand')) {
-      if (brandKeyHeader && !hasReportKey) {
-        const err = new Error('Forbidden: X-Brand-Key not permitted on report endpoints');
+      if ((brandKeyHeader || agencyKeyHeader) && !hasReportKey) {
+        const err = new Error('Forbidden: Key not permitted on report endpoints');
         err.status = 403;
         throw err;
       }
@@ -157,6 +209,7 @@ export function createApp({
     // Both permitted (e.g. reconciliation)
     if (hasBrandKey) return 'brand';
     if (hasReportKey) return 'report';
+    if (hasAgencyKey && allowedTypes.includes('agency')) return 'agency';
 
     const err = new Error('Unauthorized: Valid X-Brand-Key or X-Report-Key header required');
     err.status = 401;
@@ -166,8 +219,8 @@ export function createApp({
   const server = http.createServer(async (req, res) => {
     // Enable CORS for testing
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Brand-Key, X-Report-Key');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Brand-Key, X-Report-Key, X-Agency-Key');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -337,6 +390,16 @@ export function createApp({
           return;
         }
 
+        // Post-commit publish SSE (Strict Phase B4 payload)
+        const promoRecord = promo || (codeEntered ? store.getPromo(brand.brand_id, codeEntered) : null);
+        const eventData = {
+          type: registered ? 'use_recorded' : 'unregistered_use_recorded',
+          code: codeEntered,
+          creator: promoRecord ? promoRecord.creator_id : null,
+          time: validated.used_at || new Date().toISOString()
+        };
+        sseHub.publish(brand.brand_id, eventData.type, eventData);
+
         sendJson(res, 201, {
           success: true,
           registered,
@@ -347,6 +410,116 @@ export function createApp({
           discount_inr: fromPaise(validated.discount_paise),
           total_inr: fromPaise(validated.total_paise)
         });
+        return;
+      }
+
+      // --- FINDER ENDPOINTS (Phase B6) ---
+
+      // POST /api/finder/parse-urls (Strict URL parser, no network fetching)
+      if (pathname === '/api/finder/parse-urls' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const rawUrls = body.urls !== undefined ? body.urls : (body.url !== undefined ? body.url : '');
+        const parsed = parseBatchUrls(rawUrls);
+        sendJson(res, 200, parsed);
+        return;
+      }
+
+      // POST /api/finder/csv (X-Agency-Key required, all-or-nothing transactional commit)
+      if (pathname === '/api/finder/csv' && req.method === 'POST') {
+        authenticateAgency(req);
+        const body = await readJsonBody(req);
+        const csvContent = typeof body === 'string' ? body : (body.csv || body.data || '');
+        const parseResult = parseAndValidateCsv(csvContent);
+        if (!parseResult.valid) {
+          sendJson(res, 400, {
+            success: false,
+            errors: parseResult.errors
+          });
+          return;
+        }
+
+        const saveResult = store.saveCsvProfilesBatch(parseResult.rows);
+        sendJson(res, 201, {
+          success: true,
+          count: saveResult.count,
+          rows: parseResult.rows
+        });
+        return;
+      }
+
+      // GET /api/finder/creators (Platform-isolated ranking + unranked group + tier assumptions)
+      if (pathname === '/api/finder/creators' && req.method === 'GET') {
+        const platform = parsedUrl.searchParams.get('platform') || 'all';
+        const minCount = parsedUrl.searchParams.get('min_count') ? Number(parsedUrl.searchParams.get('min_count')) : 0;
+        const maxCount = parsedUrl.searchParams.get('max_count') ? Number(parsedUrl.searchParams.get('max_count')) : Infinity;
+
+        const tierSettings = {
+          mega: parsedUrl.searchParams.get('mega') ? Number(parsedUrl.searchParams.get('mega')) : DEFAULT_TIER_SETTINGS.mega,
+          macro: parsedUrl.searchParams.get('macro') ? Number(parsedUrl.searchParams.get('macro')) : DEFAULT_TIER_SETTINGS.macro,
+          mid: parsedUrl.searchParams.get('mid') ? Number(parsedUrl.searchParams.get('mid')) : DEFAULT_TIER_SETTINGS.mid,
+          micro: parsedUrl.searchParams.get('micro') ? Number(parsedUrl.searchParams.get('micro')) : DEFAULT_TIER_SETTINGS.micro
+        };
+
+        let profiles = store.listCreatorProfilesWithLatestSnapshot(platform);
+        // Default seed if empty for demo convenience
+        if (profiles.length === 0 && creatorsData.length > 0) {
+          for (const c of creatorsData) {
+            const pPlatform = c.primary_platform || 'youtube';
+            const handle = c.handle || `@${c.name.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
+            const canonicalUrl = pPlatform === 'youtube' ? `https://youtube.com/${handle}` : `https://instagram.com/${handle.replace('@', '')}`;
+            store.saveCreatorProfile(c.creator_id, pPlatform, handle, canonicalUrl, null);
+            const count = c.follower_count !== undefined ? c.follower_count : (c.subscriber_count !== undefined ? c.subscriber_count : null);
+            const hidden = Boolean(c.hidden_count || c.hidden);
+            store.saveCreatorSnapshot(c.creator_id, pPlatform, {
+              count: hidden ? null : count,
+              exact_or_rounded: c.exact_or_rounded || 'rounded',
+              hidden_flag: hidden ? 1 : 0,
+              fetched_time: c.fetched_time || new Date().toISOString(),
+              source: 'catalog_seed',
+              status: 'ok'
+            });
+          }
+          profiles = store.listCreatorProfilesWithLatestSnapshot(platform);
+        }
+
+        const rankedResult = rankCreators(profiles, {
+          platform,
+          minCount,
+          maxCount,
+          tierSettings
+        });
+
+        sendJson(res, 200, rankedResult);
+        return;
+      }
+
+      // POST /api/finder/profiles (X-Agency-Key required)
+      if (pathname === '/api/finder/profiles' && req.method === 'POST') {
+        authenticateAgency(req);
+        const body = await readJsonBody(req);
+        const { creator_id, canonical_url, count, exact_or_rounded, hidden_flag } = body;
+        if (!creator_id || !canonical_url) {
+          sendJson(res, 400, { error: 'creator_id and canonical_url are required' });
+          return;
+        }
+
+        const parsed = parseCreatorUrl(canonical_url);
+        if (!parsed.valid) {
+          sendJson(res, 400, { error: parsed.reason });
+          return;
+        }
+
+        store.saveCreatorProfile(creator_id, parsed.platform, parsed.handle, parsed.canonical_url, body.platform_account_id || null);
+        store.saveCreatorSnapshot(creator_id, parsed.platform, {
+          count: hidden_flag ? null : (count !== undefined && count !== null ? Number(count) : null),
+          exact_or_rounded: exact_or_rounded || 'rounded',
+          hidden_flag: hidden_flag ? 1 : 0,
+          fetched_time: new Date().toISOString(),
+          source: body.source || 'manual',
+          status: 'ok'
+        });
+
+        sendJson(res, 201, { success: true, creator_id, canonical_url: parsed.canonical_url });
         return;
       }
 
@@ -437,8 +610,14 @@ export function createApp({
         const status = derivePromoStatus(createdPromo.valid_from, createdPromo.valid_to);
         const responseData = { ...createdPromo, status };
 
-        // Post-commit publish
-        sseHub.publish(brandId, 'promo_created', responseData);
+        // Post-commit publish SSE (Strict Phase B4 payload)
+        const eventData = {
+          type: 'code_registered',
+          code: createdPromo.code,
+          creator: createdPromo.creator_id,
+          time: createdPromo.created_at || new Date().toISOString()
+        };
+        sseHub.publish(brandId, 'code_registered', eventData);
 
         sendJson(res, 201, responseData);
         return;
@@ -500,11 +679,16 @@ export function createApp({
 
         const updated = store.patchPromo(brandId, code, patchData);
         const status = derivePromoStatus(updated.valid_from, updated.valid_to);
+        // Post-commit publish SSE (Strict Phase B4 payload)
+        const eventData = {
+          type: 'code_updated',
+          code: updated.code,
+          creator: updated.creator_id,
+          time: new Date().toISOString()
+        };
+        sseHub.publish(brandId, 'code_updated', eventData);
+
         const responseData = { ...updated, status };
-
-        // Post-commit publish
-        sseHub.publish(brandId, 'code_updated', responseData);
-
         sendJson(res, 200, responseData);
         return;
       }
@@ -585,16 +769,57 @@ export function createApp({
         return;
       }
 
-      // POST /brands/:brandId/purge-seed
-      if (subPath === '/purge-seed' && req.method === 'POST') {
-        authenticate(req, brandId, ['brand']);
-        if (appEnv !== 'demo') {
-          const err = new Error('Purging seed data is only allowed in demo environment');
-          err.status = 403;
-          throw err;
+      // --- BRAND SHORTLIST ENDPOINTS (Phase B6) ---
+
+      // GET /brands/:brandId/shortlist (X-Brand-Key or X-Agency-Key)
+      if (subPath === '/shortlist' && req.method === 'GET') {
+        authenticate(req, brandId, ['brand', 'agency']);
+        const shortlist = store.getShortlist(brandId);
+        sendJson(res, 200, { brand_id: brandId, shortlist });
+        return;
+      }
+
+      // POST /brands/:brandId/shortlist (X-Brand-Key)
+      if (subPath === '/shortlist' && req.method === 'POST') {
+        authenticate(req, brandId, ['brand', 'agency']);
+        const body = await readJsonBody(req);
+        const { creator_id, notes } = body;
+
+        if (!creator_id || typeof creator_id !== 'string') {
+          sendJson(res, 400, { error: 'Field "creator_id" is required and must be a string.' });
+          return;
         }
-        store.purgeBySource('synthetic_seed');
-        sendJson(res, 200, { success: true, message: 'Synthetic seed data purged' });
+
+        const brand = getBrand(brandId);
+        const creator = creatorsData.find(c => c.creator_id === creator_id);
+        if (!creator) {
+          sendJson(res, 404, { error: `Creator "${creator_id}" not found.` });
+          return;
+        }
+
+        const eligibility = checkShortlistEligibility(creator, brand);
+        if (!eligibility.eligible) {
+          sendJson(res, 422, {
+            success: false,
+            eligible: false,
+            refusal_reason: eligibility.reason,
+            error: eligibility.reason
+          });
+          return;
+        }
+
+        const item = store.addToShortlist(brandId, creator_id, notes || null);
+        sendJson(res, 201, { success: true, eligible: true, item });
+        return;
+      }
+
+      // DELETE /brands/:brandId/shortlist/:creatorId (X-Brand-Key)
+      const shortlistDeleteMatch = subPath.match(/^\/shortlist\/([^/]+)$/);
+      if (shortlistDeleteMatch && req.method === 'DELETE') {
+        authenticate(req, brandId, ['brand', 'agency']);
+        const creatorId = shortlistDeleteMatch[1];
+        store.removeFromShortlist(brandId, creatorId);
+        sendJson(res, 200, { success: true, creator_id: creatorId });
         return;
       }
 
@@ -694,18 +919,12 @@ export function createApp({
           return;
         }
 
-        // Post-commit publish SSE
+        // Post-commit publish SSE (Strict Phase B4 payload: type, code, creator, time - zero customer IDs or prices)
         const eventData = {
-          order_id: validated.order_id,
-          code_entered: codeEntered,
-          registered,
-          validity_flag: validityFlag,
-          used_at: validated.used_at,
-          payment_confirmed_at: validated.payment_confirmed_at,
-          discount_inr: fromPaise(validated.discount_paise),
-          units: validated.items.reduce((s, it) => s + it.quantity, 0),
-          subtotal_inr: fromPaise(validated.subtotal_paise),
-          source: 'website'
+          type: registered ? 'use_recorded' : 'unregistered_use_recorded',
+          code: codeEntered,
+          creator: promo ? promo.creator_id : null,
+          time: validated.used_at || new Date().toISOString()
         };
 
         if (registered) {
@@ -746,6 +965,74 @@ export function createApp({
 
         const recon = store.getReconciliation(brandId, fromDate.toISOString(), toDate.toISOString());
         sendJson(res, 200, recon);
+        return;
+      }
+
+      // GET /brands/:brandId/creators/:creatorId/cost-per-unit (X-Brand-Key or X-Agency-Key)
+      const creatorCostMatch = subPath.match(/^\/creators\/([^/]+)\/cost-per-unit$/);
+      if (creatorCostMatch && req.method === 'GET') {
+        authenticate(req, brandId, ['brand', 'agency']);
+        const creatorId = creatorCostMatch[1];
+        const creator = creatorsData.find(c => c.creator_id === creatorId);
+        if (!creator) {
+          sendJson(res, 404, { error: `Creator "${creatorId}" not found` });
+          return;
+        }
+
+        const feeParam = parsedUrl.searchParams.get('fee_inr');
+        let feeInr;
+        if (feeParam !== null) {
+          feeInr = feeParam === '' || feeParam === 'null' ? null : Number(feeParam);
+        } else {
+          feeInr = creator.fee_inr !== undefined ? creator.fee_inr : creator.default_fee_inr;
+        }
+
+        const registeredPromos = store.listPromos(brandId).filter(p => p.creator_id === creatorId);
+        const registeredCodes = registeredPromos.map(p => p.code);
+        const allUses = store.listUses(brandId);
+
+        const result = calculateCreatorCostPerUnit({
+          brandId,
+          creatorId,
+          creatorName: creator.name,
+          feeInr,
+          registeredCodes,
+          uses: allUses
+        });
+
+        sendJson(res, 200, result);
+        return;
+      }
+
+      // GET /brands/:brandId/cost-per-unit (X-Brand-Key or X-Agency-Key)
+      if (subPath === '/cost-per-unit' && req.method === 'GET') {
+        authenticate(req, brandId, ['brand', 'agency']);
+        const allUses = store.listUses(brandId);
+        const allPromos = store.listPromos(brandId);
+        const feeOverrideParam = parsedUrl.searchParams.get('fee_inr');
+
+        const results = creatorsData.map(creator => {
+          let feeInr;
+          if (feeOverrideParam !== null) {
+            feeInr = feeOverrideParam === '' || feeOverrideParam === 'null' ? null : Number(feeOverrideParam);
+          } else {
+            feeInr = creator.fee_inr !== undefined ? creator.fee_inr : creator.default_fee_inr;
+          }
+
+          const creatorPromos = allPromos.filter(p => p.creator_id === creator.creator_id);
+          const registeredCodes = creatorPromos.map(p => p.code);
+
+          return calculateCreatorCostPerUnit({
+            brandId,
+            creatorId: creator.creator_id,
+            creatorName: creator.name,
+            feeInr,
+            registeredCodes,
+            uses: allUses
+          });
+        });
+
+        sendJson(res, 200, { brand_id: brandId, creators: results });
         return;
       }
 

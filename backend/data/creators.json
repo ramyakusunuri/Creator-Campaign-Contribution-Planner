@@ -1,0 +1,48 @@
+{
+  "_comment": "Synthetic creator data for C24 promo tracking prototype",
+  "synthetic": true,
+  "creators": [
+    {
+      "creator_id": "CR1",
+      "name": "Aarav Sharma",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR2",
+      "name": "Diya Patel",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR3",
+      "name": "Rohan Mehta",
+      "relationships": ["B2"],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR4",
+      "name": "Ananya Iyer",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR5",
+      "name": "Kabir Verma",
+      "relationships": [],
+      "excluded": true,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR6",
+      "name": "Pooja Nair",
+      "relationships": null,
+      "excluded": false,
+      "fee_inr": null
+    }
+  ]
+}

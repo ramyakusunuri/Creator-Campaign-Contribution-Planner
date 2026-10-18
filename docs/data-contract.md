@@ -1,13 +1,14 @@
-# C24 Data Contract: Promo Codes & E-Commerce Integration
+# C24 Data Contract: Promo Codes, Creator Finder & E-Commerce Integration
 
 ## 1. Conventions & Principles
 - **Monetary Unit:** Indian Rupee (**INR / ₹**). Over API wire, formatted as finite numbers with at most 2 decimal places. In SQLite storage, stored as **integer paise** (`paise = Math.round(inr * 100)`). Numbers with $>2$ decimal places are rejected with HTTP 400.
-- **Unknown Convention:** `null` and `undefined` strictly signify **UNKNOWN**, never zero. Missing discounts remain `NULL` in storage and JSON. Explicit zero discount is `0`.
+- **Unknown Convention:** `null` and `undefined` strictly signify **UNKNOWN**, never zero. Missing discounts and hidden follower counts remain `NULL` in storage and JSON. Explicit zero discount or zero fee is `0`.
 - **Timezone:** Timestamps must be full ISO 8601 strings with explicit timezones (`Z` or `+05:30` IST). Displayed in UI in Indian Standard Time (IST, UTC+05:30).
-- **Dual-Key Authentication:**
-  - `X-Brand-Key`: Authenticates brand marketing dashboard (`/brands/:brandId/promo-codes`, `/events`, `/creators`, `/purge-seed`).
+- **Role-Based Authentication:**
+  - `X-Brand-Key`: Authenticates brand marketing dashboard (`/brands/:brandId/promo-codes`, `/events`, `/creators`, `/shortlist`).
   - `X-Report-Key`: Authenticates e-commerce website server (`/brands/:brandId/promo-codes/:code/check`, `/redemptions`).
-  - Verified using constant-time string comparison (`crypto.timingSafeEqual`).
+  - `X-Agency-Key`: Authenticates agency-level shared creator catalog writes (`/api/finder/csv`, `/api/finder/profiles`).
+  - All keys are verified using constant-time string comparison (`crypto.timingSafeEqual`).
 
 ---
 
@@ -17,11 +18,45 @@
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
+-- Meta & Environment
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
 
+-- Creator Catalog & Finder (Phase B6)
+CREATE TABLE IF NOT EXISTS creator_profiles (
+  creator_id TEXT NOT NULL,
+  platform TEXT NOT NULL,                -- 'youtube' | 'instagram'
+  handle TEXT NOT NULL,
+  canonical_url TEXT NOT NULL,
+  platform_account_id TEXT,
+  PRIMARY KEY (creator_id, platform)
+);
+
+CREATE TABLE IF NOT EXISTS creator_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  creator_id TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  count INTEGER,                         -- NULL if hidden/unknown
+  exact_or_rounded TEXT NOT NULL DEFAULT 'rounded', -- 'exact' | 'rounded'
+  hidden_flag INTEGER NOT NULL DEFAULT 0,
+  fetched_time TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual',
+  status TEXT NOT NULL DEFAULT 'ok',
+  FOREIGN KEY (creator_id, platform) REFERENCES creator_profiles(creator_id, platform) ON DELETE CASCADE
+);
+
+-- Brand-Scoped Shortlists (Phase B6)
+CREATE TABLE IF NOT EXISTS shortlists (
+  brand_id TEXT NOT NULL,
+  creator_id TEXT NOT NULL,
+  added_at TEXT NOT NULL,
+  notes TEXT,
+  PRIMARY KEY (brand_id, creator_id)
+);
+
+-- Promo Codes (Phase B3)
 CREATE TABLE IF NOT EXISTS promo_codes (
   brand_id TEXT NOT NULL,
   code TEXT NOT NULL,
@@ -32,6 +67,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   PRIMARY KEY (brand_id, code)
 );
 
+-- Promo Redemptions & Uses (Phase B2 & B3)
 CREATE TABLE IF NOT EXISTS uses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   brand_id TEXT NOT NULL,
@@ -71,19 +107,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
   action TEXT NOT NULL,
   changes TEXT NOT NULL
 );
-
-PRAGMA user_version = 1;
 ```
 
 ---
 
-## 3. Demo vs Production Guards & Purge
-- Database initializes `meta.environment` from `process.env.APP_ENV || 'demo'`.
-- Method `storage.purgeBySource(source)`:
-  - Strictly requires `source === 'synthetic_seed'`.
-  - Strictly requires `environment === 'demo'`. Throws error if attempted in production.
-- Simulator `scripts/fake-website.js`:
-  - Queries `GET /health` and validates `environment === 'demo'` before executing any simulated transactions.
+## 3. Demo vs Production Security Restrictions (Phase B9)
+- **No HTTP purge endpoint:** The platform does NOT expose any endpoint capable of purging or deleting historical orders or live feeds over HTTP.
+- **No HTTP synthetic creation endpoint:** All synthetic simulations are strictly driven via external CLI scripts (`scripts/fake-website.js`) communicating over the public e-commerce reporting API.
+- **Demo Guard:** Simulation scripts query `GET /health` and refuse to run unless `environment === 'demo'`.
 
 ---
 
@@ -95,16 +126,4 @@ PRAGMA user_version = 1;
 - Idempotency logic:
   - If `order_id` does not exist: row inserted, returns HTTP 201.
   - If `order_id` exists and stored `payload_hash === new_hash`: returns HTTP 200 `{ duplicate: true }`.
-  - If `order_id` exists and stored `payload_hash !== new_hash`: rejects with HTTP 409 Conflict `{ error: "order_id already reported with different data" }`.
-
----
-
-## 5. Live Events Contract (SSE)
-- Emitted over `GET /brands/:brandId/events` with header `X-Brand-Key`.
-- Per-brand subscriber limit: 20 max (21st receives HTTP 429).
-- Heartbeat: comment `: ping\n\n` emitted every 25 seconds.
-- Event names:
-  1. `promo_created`: `{ brand_id, code, creator_id, valid_from, valid_to, created_at, status }`
-  2. `code_updated`: `{ brand_id, code, creator_id, valid_from, valid_to, status }`
-  3. `use_recorded`: `{ order_id, code_entered, registered: true, validity_flag, units, subtotal_inr, discount_inr, source: 'website' }`
-  4. `unregistered_use_recorded`: `{ order_id, code_entered, registered: false, validity_flag: 'unregistered', units, subtotal_inr, source: 'website' }`
+  - If `order_id` exists and stored `payload_hash !== new_hash`: rejects with HTTP 409 Conflict.

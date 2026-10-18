@@ -209,17 +209,15 @@ async function applyPromoCode(codeToApply) {
     return;
   }
 
-  // First, check with live C24 Promo Service backend (via X-Report-Key)
+  // First, check with backend proxy (/api/check) which securely holds C24_WEBSITE_KEY server-side
   let backendCheck = null;
   try {
-    const res = await fetch(`http://localhost:3000/brands/B1/promo-codes/${encodeURIComponent(code)}/check`, {
-      headers: { 'X-Report-Key': 'demo-report-key-b1' }
-    });
+    const res = await fetch(`/api/check?code=${encodeURIComponent(code)}`);
     if (res.ok) {
       backendCheck = await res.json();
     }
   } catch (err) {
-    console.warn('Backend promo check unreachable, checking local presets:', err);
+    console.warn('Backend proxy check unreachable, checking local presets:', err);
   }
 
   if (backendCheck && backendCheck.valid) {
@@ -1999,35 +1997,43 @@ function executePlaceOrder() {
       const reportPayload = {
         order_id: cleanOrderId,
         customer_id: pseudoCustomerId,
+        promo_code: promoCode,
         used_at: nowIso,
         payment_confirmed_at: nowIso,
         discount_inr: discountVal,
-        items: state.cart.map((it, idx) => {
-          const lineGross = it.price * it.quantity;
-          const lineDisc = idx === state.cart.length - 1
-            ? Math.max(0, Math.round((discountVal - Math.floor((discountVal * (subtotalVal - lineGross)) / subtotalVal)) * 100) / 100)
-            : Math.round(((discountVal * lineGross) / subtotalVal) * 100) / 100;
-          return {
-            product_id: 'PRD-' + it.productId,
-            name: it.title,
-            unit_price_inr: it.price,
-            quantity: it.quantity,
-            line_discount_inr: lineDisc
-          };
-        })
+        items: (() => {
+          let allocatedDiscSoFar = 0;
+          return state.cart.map((it, idx) => {
+            let lineDisc = 0;
+            if (idx === state.cart.length - 1) {
+              lineDisc = Math.max(0, Math.round((discountVal - allocatedDiscSoFar) * 100) / 100);
+            } else {
+              const lineGross = it.price * it.quantity;
+              lineDisc = Math.round(((discountVal * lineGross) / subtotalVal) * 100) / 100;
+              allocatedDiscSoFar += lineDisc;
+            }
+            return {
+              product_id: 'PRD-' + it.productId,
+              name: it.title,
+              unit_price_inr: it.price,
+              quantity: it.quantity,
+              line_discount_inr: lineDisc
+            };
+          });
+        })()
       };
 
-      fetch(`http://localhost:3000/brands/B1/promo-codes/${encodeURIComponent(promoCode)}/redemptions`, {
+      // Report via secure backend proxy (/api/order) which injects C24_WEBSITE_KEY server-side
+      fetch('/api/order', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-Report-Key': 'demo-report-key-b1'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(reportPayload)
       }).then(r => r.json()).then(data => {
-        console.log('[C24 Promo Sync] Order reported to Brand Command:', data);
+        console.log('[C24 Promo Sync] Order reported securely through backend proxy:', data);
       }).catch(err => {
-        console.warn('[C24 Promo Sync] Failed to report to promo service:', err);
+        console.warn('[C24 Promo Sync] Failed to report order via proxy:', err);
       });
     }
 

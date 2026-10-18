@@ -6,37 +6,43 @@
       "creator_id": "CR1",
       "name": "Aarav Sharma",
       "relationships": [],
-      "excluded": false
+      "excluded": false,
+      "fee_inr": 20000
     },
     {
       "creator_id": "CR2",
       "name": "Diya Patel",
       "relationships": [],
-      "excluded": false
+      "excluded": false,
+      "fee_inr": 20000
     },
     {
       "creator_id": "CR3",
       "name": "Rohan Mehta",
       "relationships": ["B2"],
-      "excluded": false
+      "excluded": false,
+      "fee_inr": 20000
     },
     {
       "creator_id": "CR4",
       "name": "Ananya Iyer",
       "relationships": [],
-      "excluded": false
+      "excluded": false,
+      "fee_inr": 20000
     },
     {
       "creator_id": "CR5",
       "name": "Kabir Verma",
       "relationships": [],
-      "excluded": true
+      "excluded": true,
+      "fee_inr": 20000
     },
     {
       "creator_id": "CR6",
       "name": "Pooja Nair",
       "relationships": null,
-      "excluded": false
+      "excluded": false,
+      "fee_inr": null
     }
   ]
 }

@@ -57,25 +57,25 @@ export async function POST(
   }
 
   try {
-    const result = validateAndIngestOrder(brandId, body, cleanCode);
+    const result = validateAndIngestOrder(brandId, body, cleanCode, { allowIdempotentDuplicates: true });
 
     if ('duplicate' in result || !('items' in result)) {
       return NextResponse.json(result, { status: 200 });
     }
 
     const eventName = result.registered ? 'use_recorded' : 'unregistered_use_recorded';
+    let creatorId: string | null = null;
+    try {
+      const db = (await import('@/lib/db')).getDb();
+      const row = db.prepare('SELECT creator_id FROM promo_codes WHERE brand_id = ? AND code = ?;').get(brandId, cleanCode) as any;
+      if (row) creatorId = row.creator_id;
+    } catch {}
+
     const eventPayload = {
-      order_id: result.order_id,
+      type: eventName,
       code: cleanCode,
-      promo_code: result.promo_code,
-      registered: result.registered,
-      validity_flag: result.validity_flag,
-      used_at: body.used_at,
-      discount_inr: result.discount_inr,
-      discount_basis: result.discount_basis,
-      subtotal_inr: result.subtotal_inr,
-      total_inr: result.total_inr,
-      source: 'website'
+      creator: creatorId,
+      time: body.used_at || new Date().toISOString()
     };
 
     try {

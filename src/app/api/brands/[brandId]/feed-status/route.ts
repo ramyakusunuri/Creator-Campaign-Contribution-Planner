@@ -24,16 +24,32 @@ export async function GET(
     WHERE brand_id = ?;
   `).get(brandId) as { last_received: string | null; total_count: number; unreg_count: number } | undefined;
 
-  const total = row?.total_count || 0;
-  const unreg = row?.unreg_count || 0;
+  let unregTableCount = 0;
+  let unregLast: string | null = null;
+  try {
+    const unregRow = db.prepare(`
+      SELECT COUNT(*) as count, MAX(used_at) as last_used
+      FROM unregistered_code_uses
+      WHERE brand_id = ?;
+    `).get(brandId) as { count: number; last_used: string | null } | undefined;
+    if (unregRow) {
+      unregTableCount = unregRow.count || 0;
+      unregLast = unregRow.last_used;
+    }
+  } catch {}
+
+  const totalUnregistered = (row?.unreg_count || 0) + unregTableCount;
+  const dates = [row?.last_received, unregLast].filter((d): d is string => Boolean(d));
+  dates.sort();
+  const lastReceived = dates.length > 0 ? dates[dates.length - 1] : null;
 
   return NextResponse.json({
     brand_id: brandId,
-    last_use_received_at: row?.last_received || null,
+    last_use_received_at: lastReceived,
     uses_by_source: {
-      website: total,
+      website: (row?.total_count || 0) + unregTableCount,
       synthetic_seed: 0
     },
-    unregistered_uses: unreg
+    unregistered_uses: totalUnregistered
   });
 }

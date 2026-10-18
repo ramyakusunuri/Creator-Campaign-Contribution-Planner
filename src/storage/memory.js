@@ -1,4 +1,5 @@
 import { fromPaise } from './interface.js';
+import { calculateCreatorCostPerUnit } from '../lib/costPerUnit.js';
 
 export class MemoryStorage {
   constructor(appEnv = 'demo') {
@@ -9,10 +10,13 @@ export class MemoryStorage {
     this.useItems = new Map(); // key: useId -> array of item objects
     this.auditLog = [];
     this.nextUseId = 1;
+    this.creatorProfiles = new Map(); // key: `${creatorId}:${platform}`
+    this.creatorSnapshots = []; // array of snapshot objects
+    this.shortlists = new Map(); // key: `${brandId}:${creatorId}`
   }
 
   createPromo(brandId, promoData) {
-    const { code, creator_id, valid_from, valid_to, created_at } = promoData;
+    const { code, creator_id, valid_from, valid_to, created_at = new Date().toISOString() } = promoData;
     const key = `${brandId}:${code}`;
     if (this.promoCodes.has(key)) {
       const err = new Error(`Promo code "${code}" already exists for brand "${brandId}".`);
@@ -321,6 +325,149 @@ export class MemoryStorage {
       }
     }
     this.uses = keepUses;
+  }
+
+  getCostPerUnit(brandId, creatorId, options = {}) {
+    const allPromos = this.listPromos(brandId);
+    const creatorPromos = allPromos.filter(p => p.creator_id === creatorId);
+    const registeredCodes = creatorPromos.map(p => p.code);
+    const allUses = this.listUses(brandId);
+    return calculateCreatorCostPerUnit({
+      brandId,
+      creatorId,
+      creatorName: options.creatorName,
+      feeInr: options.feeInr,
+      registeredCodes,
+      uses: allUses,
+      refunds: options.refunds || []
+    });
+  }
+
+  saveCreatorProfile(creatorId, platform, handle, canonicalUrl, platformAccountId = null) {
+    const key = `${creatorId}:${platform.toLowerCase()}`;
+    this.creatorProfiles.set(key, {
+      creator_id: creatorId,
+      platform: platform.toLowerCase(),
+      handle,
+      canonical_url: canonicalUrl,
+      platform_account_id: platformAccountId
+    });
+  }
+
+  saveCreatorSnapshot(creatorId, platform, snapshotData) {
+    const record = {
+      id: this.creatorSnapshots.length + 1,
+      creator_id: creatorId,
+      platform: platform.toLowerCase(),
+      count: snapshotData.count !== undefined ? snapshotData.count : null,
+      exact_or_rounded: snapshotData.exact_or_rounded || 'rounded',
+      hidden_flag: snapshotData.hidden_flag ? 1 : 0,
+      fetched_time: snapshotData.fetched_time || new Date().toISOString(),
+      source: snapshotData.source || 'manual',
+      status: snapshotData.status || 'ok'
+    };
+    this.creatorSnapshots.push(record);
+    return record;
+  }
+
+  listCreatorProfilesWithLatestSnapshot(platform = null) {
+    const results = [];
+    for (const p of this.creatorProfiles.values()) {
+      if (platform && platform !== 'all' && p.platform.toLowerCase() !== platform.toLowerCase()) {
+        continue;
+      }
+
+      // Find latest snapshot
+      let latest = null;
+      for (let i = this.creatorSnapshots.length - 1; i >= 0; i--) {
+        const s = this.creatorSnapshots[i];
+        if (s.creator_id === p.creator_id && s.platform.toLowerCase() === p.platform.toLowerCase()) {
+          latest = s;
+          break;
+        }
+      }
+
+      results.push({
+        ...p,
+        count: latest ? latest.count : null,
+        exact_or_rounded: latest ? latest.exact_or_rounded : 'rounded',
+        hidden_flag: latest ? latest.hidden_flag : 0,
+        fetched_time: latest ? latest.fetched_time : null,
+        source: latest ? latest.source : 'manual',
+        status: latest ? latest.status : 'ok'
+      });
+    }
+
+    results.sort((a, b) => a.creator_id.localeCompare(b.creator_id));
+    return results;
+  }
+
+  addToShortlist(brandId, creatorId, notes = null) {
+    const addedAt = new Date().toISOString();
+    const key = `${brandId}:${creatorId}`;
+    const record = {
+      brand_id: brandId,
+      creator_id: creatorId,
+      added_at: addedAt,
+      notes
+    };
+    this.shortlists.set(key, record);
+    return record;
+  }
+
+  removeFromShortlist(brandId, creatorId) {
+    const key = `${brandId}:${creatorId}`;
+    this.shortlists.delete(key);
+    return { success: true };
+  }
+
+  getShortlist(brandId) {
+    const results = [];
+    for (const item of this.shortlists.values()) {
+      if (item.brand_id === brandId) {
+        results.push({ ...item });
+      }
+    }
+    results.sort((a, b) => b.added_at.localeCompare(a.added_at));
+    return results;
+  }
+
+  saveCsvProfilesBatch(rows) {
+    // All or nothing in-memory
+    const tempProfiles = [];
+    const tempSnapshots = [];
+
+    for (const r of rows) {
+      tempProfiles.push({
+        creator_id: r.creator_id,
+        platform: r.platform.toLowerCase(),
+        handle: r.handle,
+        canonical_url: r.canonical_url,
+        platform_account_id: null
+      });
+      tempSnapshots.push({
+        id: this.creatorSnapshots.length + tempSnapshots.length + 1,
+        creator_id: r.creator_id,
+        platform: r.platform.toLowerCase(),
+        count: r.count,
+        exact_or_rounded: r.exact_or_rounded || 'rounded',
+        hidden_flag: r.hidden_flag || 0,
+        fetched_time: r.fetched_time || new Date().toISOString(),
+        source: r.source || 'csv_upload',
+        status: r.status || 'ok'
+      });
+    }
+
+    // Commit
+    for (const p of tempProfiles) {
+      const key = `${p.creator_id}:${p.platform}`;
+      this.creatorProfiles.set(key, p);
+    }
+    for (const s of tempSnapshots) {
+      this.creatorSnapshots.push(s);
+    }
+
+    return { success: true, count: rows.length };
   }
 
   close() {}

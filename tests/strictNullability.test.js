@@ -1,7 +1,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { getDb, resetDbForTesting } from '../src/lib/db.ts';
-import { renderOrUnknown, formatINR, formatINRWithPaise, shortINR } from '../src/lib/formatters.ts';
+import { getDb, resetDbForTesting } from '../backend/src/lib/db.ts';
+import { renderOrUnknown, formatINR, formatINRWithPaise, shortINR } from '../backend/src/lib/formatters.ts';
 
 describe('Phase 1 Strict Nullability Test Suite', () => {
   before(() => {

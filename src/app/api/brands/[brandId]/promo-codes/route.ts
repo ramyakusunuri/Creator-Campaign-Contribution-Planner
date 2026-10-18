@@ -145,9 +145,15 @@ export async function POST(
 
   try {
     const { getSseHub } = await import('../../../../../lib/sseHub.ts');
-    getSseHub().publish(brandId, 'promo_created', responsePayload);
+    const eventData = {
+      type: 'code_registered',
+      code: cleanCode,
+      creator: creatorId,
+      time: createdAtIso
+    };
+    getSseHub().publish(brandId, 'code_registered', eventData);
   } catch (err) {
-    console.error('Failed to publish promo_created SSE event:', err);
+    console.error('Failed to publish code_registered SSE event:', err);
   }
 
   return Response.json(responsePayload, { status: 201 });

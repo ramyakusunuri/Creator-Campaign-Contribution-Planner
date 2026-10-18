@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 
-export const LATEST_SCHEMA_VERSION = 3;
+export const LATEST_SCHEMA_VERSION = 5;
 
 export interface Migration {
   version: number;
@@ -203,6 +203,281 @@ export const MIGRATIONS: Migration[] = [
       try {
         db.exec("ALTER TABLE orders ADD COLUMN payment_confirmed_at TEXT NULL;");
       } catch {}
+    }
+  },
+  {
+    version: 4,
+    name: '004_creator_finder_and_shortlist',
+    up: (db: DatabaseSync) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS creator_profiles (
+          creator_id TEXT NOT NULL,
+          platform TEXT NOT NULL,
+          handle TEXT NOT NULL,
+          canonical_url TEXT NOT NULL,
+          platform_account_id TEXT,
+          PRIMARY KEY (creator_id, platform)
+        );
+
+        CREATE TABLE IF NOT EXISTS creator_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          creator_id TEXT NOT NULL,
+          platform TEXT NOT NULL,
+          count INTEGER NULL,
+          exact_or_rounded TEXT NOT NULL DEFAULT 'rounded',
+          hidden_flag INTEGER NOT NULL DEFAULT 0,
+          fetched_time TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'manual',
+          status TEXT NOT NULL DEFAULT 'ok'
+        );
+
+        CREATE TABLE IF NOT EXISTS shortlists (
+          brand_id TEXT NOT NULL,
+          creator_id TEXT NOT NULL,
+          added_at TEXT NOT NULL,
+          notes TEXT,
+          PRIMARY KEY (brand_id, creator_id)
+        );
+      `);
+    }
+  },
+  {
+    version: 5,
+    name: '005_frontend_creator_raw_inputs',
+    up: (db: DatabaseSync) => {
+      const rawCols = [
+        { col: 'slug', type: 'TEXT NULL' },
+        { col: 'handle', type: 'TEXT NULL' },
+        { col: 'location', type: 'TEXT NULL' },
+        { col: 'followers', type: 'INTEGER NULL' },
+        { col: 'primary_platform', type: 'TEXT NULL' },
+        { col: 'bio', type: 'TEXT NULL' },
+        { col: 'orders', type: 'INTEGER NOT NULL DEFAULT 0' },
+        { col: 'discount', type: 'REAL NOT NULL DEFAULT 0' },
+        { col: 'sp_inr', type: 'REAL NOT NULL DEFAULT 0' },
+        { col: 'sp_paise', type: 'INTEGER NOT NULL DEFAULT 0' },
+        { col: 'cp_inr', type: 'REAL NOT NULL DEFAULT 0' },
+        { col: 'cp_paise', type: 'INTEGER NOT NULL DEFAULT 0' },
+        { col: 'fee_inr', type: 'REAL NOT NULL DEFAULT 0' },
+        { col: 'fee_paise', type: 'INTEGER NOT NULL DEFAULT 0' },
+        { col: 'clicks', type: 'INTEGER NOT NULL DEFAULT 0' },
+        { col: 'buys', type: 'INTEGER NOT NULL DEFAULT 0' }
+      ];
+
+      for (const rc of rawCols) {
+        try {
+          db.exec(`ALTER TABLE creators ADD COLUMN ${rc.col} ${rc.type};`);
+        } catch {}
+      }
+
+      // Seed 8 frontend creators with RAW inputs only (no calculated/derived fields stored)
+      const rawCreators = [
+        {
+          creator_id: 'creator_001',
+          slug: 'creator_001',
+          name: 'Aarav Mehta',
+          category: 'Photography & Travel',
+          handle: '@aaravframes',
+          location: 'Mumbai, Maharashtra',
+          followers: 48200,
+          primary_platform: 'Instagram',
+          bio: 'Cinematic city escapes, practical travel guides, and photography tips.',
+          orders: 1800,
+          discount: 10,
+          sp_inr: 1800,
+          sp_paise: 180000,
+          cp_inr: 700,
+          cp_paise: 70000,
+          fee_inr: 400000,
+          fee_paise: 40000000,
+          clicks: 1800,
+          buys: 90
+        },
+        {
+          creator_id: 'creator_002',
+          slug: 'creator_002',
+          name: 'Diya Sharma',
+          category: 'Beauty & Skincare',
+          handle: '@diyabeautyedit',
+          location: 'Delhi, India',
+          followers: 73500,
+          primary_platform: 'Instagram',
+          bio: 'Clean beauty routines, ingredient deep-dives, and seasonal skincare edits.',
+          orders: 1300,
+          discount: 15,
+          sp_inr: 1500,
+          sp_paise: 150000,
+          cp_inr: 600,
+          cp_paise: 60000,
+          fee_inr: 250000,
+          fee_paise: 25000000,
+          clicks: 2200,
+          buys: 130
+        },
+        {
+          creator_id: 'creator_003',
+          slug: 'creator_003',
+          name: 'Rohan Varma',
+          category: 'Fitness & Health',
+          handle: '@rohanlifts',
+          location: 'Bengaluru, Karnataka',
+          followers: 61200,
+          primary_platform: 'YouTube',
+          bio: 'Strength fundamentals, home workout splits, and recovery nutrition.',
+          orders: 2400,
+          discount: 8,
+          sp_inr: 2200,
+          sp_paise: 220000,
+          cp_inr: 900,
+          cp_paise: 90000,
+          fee_inr: 600000,
+          fee_paise: 60000000,
+          clicks: 1950,
+          buys: 110
+        },
+        {
+          creator_id: 'creator_004',
+          slug: 'creator_004',
+          name: 'Ananya Iyer',
+          category: 'Tech & Gadgets',
+          handle: '@ananyatech',
+          location: 'Hyderabad, Telangana',
+          followers: 89400,
+          primary_platform: 'YouTube',
+          bio: 'Consumer electronics breakdowns, desk setups, and workflow software.',
+          orders: 900,
+          discount: 20,
+          sp_inr: 1200,
+          sp_paise: 120000,
+          cp_inr: 500,
+          cp_paise: 50000,
+          fee_inr: 150000,
+          fee_paise: 15000000,
+          clicks: 3100,
+          buys: 185
+        },
+        {
+          creator_id: 'creator_005',
+          slug: 'creator_005',
+          name: 'Kabir Sen',
+          category: 'Fashion & Lifestyle',
+          handle: '@kabirfits',
+          location: 'Mumbai, Maharashtra',
+          followers: 54100,
+          primary_platform: 'Instagram',
+          bio: 'Everyday luxury menswear, capsule wardrobes, and sneaker styling.',
+          orders: 1600,
+          discount: 10,
+          sp_inr: 1600,
+          sp_paise: 160000,
+          cp_inr: 650,
+          cp_paise: 65000,
+          fee_inr: 300000,
+          fee_paise: 30000000,
+          clicks: 2400,
+          buys: 120
+        },
+        {
+          creator_id: 'creator_006',
+          slug: 'creator_006',
+          name: 'Meera Nair',
+          category: 'Food & Cooking',
+          handle: '@meeraeats',
+          location: 'Kochi, Kerala',
+          followers: 66800,
+          primary_platform: 'Instagram',
+          bio: 'Modern coastal recipes, slow weekend cooking, and pantry shortcuts.',
+          orders: 700,
+          discount: 5,
+          sp_inr: 2000,
+          sp_paise: 200000,
+          cp_inr: 800,
+          cp_paise: 80000,
+          fee_inr: 100000,
+          fee_paise: 10000000,
+          clicks: 2100,
+          buys: 115
+        },
+        {
+          creator_id: 'creator_007',
+          slug: 'creator_007',
+          name: 'Vikram Malhotra',
+          category: 'Gaming & Esports',
+          handle: '@vikramplay',
+          location: 'Pune, Maharashtra',
+          followers: 98300,
+          primary_platform: 'YouTube',
+          bio: 'Competitive PC gaming benchmarks, mechanical keyboards, and peripherals.',
+          orders: 2000,
+          discount: 12,
+          sp_inr: 2100,
+          sp_paise: 210000,
+          cp_inr: 850,
+          cp_paise: 85000,
+          fee_inr: 500000,
+          fee_paise: 50000000,
+          clicks: 3400,
+          buys: 200
+        },
+        {
+          creator_id: 'creator_008',
+          slug: 'creator_008',
+          name: 'Pooja Joshi',
+          category: 'Parenting & Family',
+          handle: '@poojaparenting',
+          location: 'Jaipur, Rajasthan',
+          followers: 42900,
+          primary_platform: 'Instagram',
+          bio: 'Practical family routines, kid-friendly travel packing, and learning spaces.',
+          orders: 1100,
+          discount: 10,
+          sp_inr: 1400,
+          sp_paise: 140000,
+          cp_inr: 550,
+          cp_paise: 55000,
+          fee_inr: 200000,
+          fee_paise: 20000000,
+          clicks: 1600,
+          buys: 85
+        }
+      ];
+
+      const stmt = db.prepare(`
+        INSERT INTO creators (
+          creator_id, slug, name, category, handle, location, followers, primary_platform, bio,
+          orders, discount, sp_inr, sp_paise, cp_inr, cp_paise, fee_inr, fee_paise, clicks, buys,
+          default_fee_inr, default_fee_paise, default_sp_inr, default_sp_paise, default_cp_inr, default_cp_paise,
+          default_margin_pct, default_incremental_share
+        ) VALUES (
+          @creator_id, @slug, @name, @category, @handle, @location, @followers, @primary_platform, @bio,
+          @orders, @discount, @sp_inr, @sp_paise, @cp_inr, @cp_paise, @fee_inr, @fee_paise, @clicks, @buys,
+          @fee_inr, @fee_paise, @sp_inr, @sp_paise, @cp_inr, @cp_paise,
+          40, 0.8
+        )
+        ON CONFLICT(creator_id) DO UPDATE SET
+          slug = excluded.slug,
+          name = excluded.name,
+          category = excluded.category,
+          handle = excluded.handle,
+          location = excluded.location,
+          followers = excluded.followers,
+          primary_platform = excluded.primary_platform,
+          bio = excluded.bio,
+          orders = excluded.orders,
+          discount = excluded.discount,
+          sp_inr = excluded.sp_inr,
+          sp_paise = excluded.sp_paise,
+          cp_inr = excluded.cp_inr,
+          cp_paise = excluded.cp_paise,
+          fee_inr = excluded.fee_inr,
+          fee_paise = excluded.fee_paise,
+          clicks = excluded.clicks,
+          buys = excluded.buys;
+      `);
+
+      for (const rc of rawCreators) {
+        stmt.run(rc);
+      }
     }
   }
 ];

@@ -1,4 +1,5 @@
 import { toPaise, fromPaise, canonicalHash } from './interface.js';
+import { calculateCreatorCostPerUnit } from '../lib/costPerUnit.js';
 
 let DatabaseSync;
 try {
@@ -89,6 +90,35 @@ export class SqliteStorage {
           changes TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS creator_profiles (
+          creator_id TEXT NOT NULL,
+          platform TEXT NOT NULL,
+          handle TEXT NOT NULL,
+          canonical_url TEXT NOT NULL,
+          platform_account_id TEXT,
+          PRIMARY KEY (creator_id, platform)
+        );
+
+        CREATE TABLE IF NOT EXISTS creator_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          creator_id TEXT NOT NULL,
+          platform TEXT NOT NULL,
+          count INTEGER,
+          exact_or_rounded TEXT NOT NULL DEFAULT 'rounded',
+          hidden_flag INTEGER NOT NULL DEFAULT 0,
+          fetched_time TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'manual',
+          status TEXT NOT NULL DEFAULT 'ok'
+        );
+
+        CREATE TABLE IF NOT EXISTS shortlists (
+          brand_id TEXT NOT NULL,
+          creator_id TEXT NOT NULL,
+          added_at TEXT NOT NULL,
+          notes TEXT,
+          PRIMARY KEY (brand_id, creator_id)
+        );
+
         PRAGMA user_version = 1;
       `);
 
@@ -97,7 +127,7 @@ export class SqliteStorage {
   }
 
   createPromo(brandId, promoData) {
-    const { code, creator_id, valid_from, valid_to, created_at } = promoData;
+    const { code, creator_id, valid_from, valid_to, created_at = new Date().toISOString() } = promoData;
     this.db.exec('BEGIN IMMEDIATE;');
     try {
       const existing = this.db.prepare('SELECT code FROM promo_codes WHERE brand_id = ? AND code = ?;').get(brandId, code);
@@ -433,6 +463,131 @@ export class SqliteStorage {
         DELETE FROM uses WHERE source = 'synthetic_seed';
       `);
       this.db.exec('COMMIT;');
+    } catch (err) {
+      this.db.exec('ROLLBACK;');
+      throw err;
+    }
+  }
+
+  getCostPerUnit(brandId, creatorId, options = {}) {
+    const allPromos = this.listPromos(brandId);
+    const creatorPromos = allPromos.filter(p => p.creator_id === creatorId);
+    const registeredCodes = creatorPromos.map(p => p.code);
+    const allUses = this.listUses(brandId);
+    return calculateCreatorCostPerUnit({
+      brandId,
+      creatorId,
+      creatorName: options.creatorName,
+      feeInr: options.feeInr,
+      registeredCodes,
+      uses: allUses,
+      refunds: options.refunds || []
+    });
+  }
+
+  saveCreatorProfile(creatorId, platform, handle, canonicalUrl, platformAccountId = null) {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO creator_profiles (creator_id, platform, handle, canonical_url, platform_account_id)
+      VALUES (?, ?, ?, ?, ?);
+    `).run(creatorId, platform, handle, canonicalUrl, platformAccountId);
+  }
+
+  saveCreatorSnapshot(creatorId, platform, snapshotData) {
+    const {
+      count = null,
+      exact_or_rounded = 'rounded',
+      hidden_flag = 0,
+      fetched_time = new Date().toISOString(),
+      source = 'manual',
+      status = 'ok'
+    } = snapshotData;
+
+    this.db.prepare(`
+      INSERT INTO creator_snapshots (creator_id, platform, count, exact_or_rounded, hidden_flag, fetched_time, source, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    `).run(creatorId, platform, count, exact_or_rounded, hidden_flag ? 1 : 0, fetched_time, source, status);
+  }
+
+  listCreatorProfilesWithLatestSnapshot(platform = null) {
+    let sql = `
+      SELECT 
+        p.creator_id,
+        p.platform,
+        p.handle,
+        p.canonical_url,
+        p.platform_account_id,
+        s.count,
+        s.exact_or_rounded,
+        s.hidden_flag,
+        s.fetched_time,
+        s.source,
+        s.status
+      FROM creator_profiles p
+      LEFT JOIN creator_snapshots s ON s.id = (
+        SELECT id FROM creator_snapshots 
+        WHERE creator_id = p.creator_id AND platform = p.platform 
+        ORDER BY id DESC LIMIT 1
+      )
+    `;
+    const params = [];
+    if (platform && platform !== 'all') {
+      sql += ' WHERE p.platform = ?';
+      params.push(platform);
+    }
+    sql += ' ORDER BY p.creator_id ASC;';
+    return this.db.prepare(sql).all(...params);
+  }
+
+  addToShortlist(brandId, creatorId, notes = null) {
+    const addedAt = new Date().toISOString();
+    this.db.prepare(`
+      INSERT OR REPLACE INTO shortlists (brand_id, creator_id, added_at, notes)
+      VALUES (?, ?, ?, ?);
+    `).run(brandId, creatorId, addedAt, notes);
+    return { brand_id: brandId, creator_id: creatorId, added_at: addedAt, notes };
+  }
+
+  removeFromShortlist(brandId, creatorId) {
+    this.db.prepare('DELETE FROM shortlists WHERE brand_id = ? AND creator_id = ?;').run(brandId, creatorId);
+    return { success: true };
+  }
+
+  getShortlist(brandId) {
+    return this.db.prepare(`
+      SELECT s.brand_id, s.creator_id, s.added_at, s.notes
+      FROM shortlists s
+      WHERE s.brand_id = ?
+      ORDER BY s.added_at DESC;
+    `).all(brandId);
+  }
+
+  saveCsvProfilesBatch(rows) {
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      const insertProfile = this.db.prepare(`
+        INSERT OR REPLACE INTO creator_profiles (creator_id, platform, handle, canonical_url, platform_account_id)
+        VALUES (?, ?, ?, ?, ?);
+      `);
+      const insertSnapshot = this.db.prepare(`
+        INSERT INTO creator_snapshots (creator_id, platform, count, exact_or_rounded, hidden_flag, fetched_time, source, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+      `);
+
+      for (const row of rows) {
+        insertProfile.run(row.creator_id, row.platform, row.handle, row.canonical_url, null);
+        insertSnapshot.run(
+          row.creator_id,
+          row.platform,
+          row.count,
+          row.exact_or_rounded || 'rounded',
+          row.hidden_flag || 0,
+          row.fetched_time || new Date().toISOString(),
+          row.source || 'csv_upload',
+          row.status || 'ok'
+        );
+      }
+      this.db.exec('COMMIT;');
+      return { success: true, count: rows.length };
     } catch (err) {
       this.db.exec('ROLLBACK;');
       throw err;

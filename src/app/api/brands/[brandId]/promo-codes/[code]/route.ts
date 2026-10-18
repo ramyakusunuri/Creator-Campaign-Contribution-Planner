@@ -325,7 +325,7 @@ export async function PATCH(
   const existing = db
     .prepare('SELECT * FROM promo_codes WHERE brand_id = ? AND code = ?;')
     .get(brandId, cleanCode) as
-    | { valid_from: string; valid_to: string }
+    | { valid_from: string; valid_to: string; creator_id: string }
     | undefined;
 
   if (!existing) {
@@ -419,7 +419,13 @@ export async function PATCH(
 
   try {
     const { getSseHub } = await import('../../../../../../lib/sseHub.ts');
-    getSseHub().publish(brandId, 'code_updated', responsePayload);
+    const eventData = {
+      type: 'code_updated',
+      code: cleanCode,
+      creator: existing.creator_id,
+      time: new Date().toISOString()
+    };
+    getSseHub().publish(brandId, 'code_updated', eventData);
   } catch (err) {
     console.error('Failed to publish code_updated SSE event:', err);
   }

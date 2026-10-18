@@ -1,8 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { SqliteStorage } from '../src/storage/sqlite.js';
-import { MemoryStorage } from '../src/storage/memory.js';
-import { toPaise, fromPaise, canonicalHash } from '../src/storage/interface.js';
+import { SqliteStorage } from '../backend/src/storage/sqlite.js';
+import { MemoryStorage } from '../backend/src/storage/memory.js';
+import { toPaise, fromPaise, canonicalHash } from '../backend/src/storage/interface.js';
 
 function runContractTests(storageName, storageFactory) {
   describe(`Storage Contract Suite: ${storageName}`, () => {

@@ -66,22 +66,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // Publish to live dashboard feed
+    // Publish to live dashboard feed (Strict Phase B4 payload: type, code, creator, time only)
     try {
       const { getSseHub } = await import('../../../../../lib/sseHub.ts');
-      const eventName = (result as any).registered ? 'use_recorded' : 'unregistered_use_recorded';
-      getSseHub().publish(auth.brand.brand_id, eventName, {
-        order_id: (result as any).order_id,
-        promo_code: (result as any).promo_code,
-        registered: (result as any).registered,
-        validity_flag: (result as any).validity_flag,
-        used_at: body.used_at,
-        payment_confirmed_at: body.payment_confirmed_at,
-        discount_inr: (result as any).discount_inr,
-        subtotal_inr: (result as any).subtotal_inr,
-        total_inr: (result as any).total_inr,
-        source: 'website'
-      });
+      const isRegistered = Boolean((result as any).registered);
+      const eventType = isRegistered ? 'use_recorded' : 'unregistered_use_recorded';
+      const promoCode = (result as any).promo_code || null;
+      let creatorId: string | null = null;
+      if (promoCode) {
+        try {
+          const { getDb } = await import('../../../../../lib/db.ts');
+          const promoRow = getDb().prepare('SELECT creator_id FROM promo_codes WHERE brand_id = ? AND code = ?;').get(auth.brand.brand_id, promoCode) as any;
+          if (promoRow) creatorId = promoRow.creator_id;
+        } catch {}
+      }
+      const eventPayload = {
+        type: eventType,
+        code: promoCode,
+        creator: creatorId,
+        time: body.used_at || new Date().toISOString()
+      };
+      getSseHub().publish(auth.brand.brand_id, eventType, eventPayload);
     } catch {}
 
     return Response.json(result, { status: 201 });

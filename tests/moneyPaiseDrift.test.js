@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { toPaise, toPaiseNullable, fromPaise, assertMoneyDecimals } from '../src/lib/moneyValidation.ts';
+import { toPaise, toPaiseNullable, fromPaise, assertMoneyDecimals } from '../backend/src/lib/moneyValidation.ts';
 
 describe('Phase 1 Money & Paise Drift Test Suite', () => {
   test('Exact round-trip conversion with zero floating-point drift', () => {

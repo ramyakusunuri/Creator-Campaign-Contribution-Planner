@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 
-const PORT = parseInt(process.env.STORE_PORT || '3001', 10);
+const PORT = parseInt(process.env.STORE_PORT || '3002', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 const MIME_TYPES = {
@@ -36,6 +36,20 @@ const server = http.createServer((req, res) => {
 
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   let pathname = decodeURIComponent(parsedUrl.pathname);
+
+  // Backend Proxies holding C24_WEBSITE_KEY server-side
+  const proxyConfig = {
+    websiteKey: process.env.C24_WEBSITE_KEY || 'demo-report-key-b1',
+    apiUrl: process.env.C24_API_URL || 'http://localhost:3000',
+    brandId: process.env.BRAND_ID || 'B1'
+  };
+
+  if (pathname === '/api/check' && req.method === 'GET') {
+    return import('../storefront-app/src/api/check.js').then(m => m.handlePromoCheck(req, res, proxyConfig));
+  }
+  if (pathname === '/api/order' && req.method === 'POST') {
+    return import('../storefront-app/src/api/order.js').then(m => m.handleOrderReport(req, res, proxyConfig));
+  }
 
   if (pathname === '/' || pathname === '') {
     pathname = '/index.html';

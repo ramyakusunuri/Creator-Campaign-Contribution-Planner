@@ -1,9 +1,9 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { authenticateAgencyKey, authenticateBrand, authenticateReportKey } from '../src/lib/auth.ts';
-import { runMigrations, LATEST_SCHEMA_VERSION } from '../src/lib/migrations.ts';
-import { resetDbForTesting } from '../src/lib/db.ts';
+import { authenticateAgencyKey, authenticateBrand, authenticateReportKey } from '../backend/src/lib/auth.ts';
+import { runMigrations, LATEST_SCHEMA_VERSION } from '../backend/src/lib/migrations.ts';
+import { resetDbForTesting } from '../backend/src/lib/db.ts';
 
 describe('Phase 1 Security & Authentication Test Suite', () => {
   before(() => {

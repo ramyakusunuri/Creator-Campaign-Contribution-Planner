@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp } from '../src/app.js';
-import { SqliteStorage } from '../src/storage/sqlite.js';
-import { toPaise, fromPaise, canonicalHash } from '../src/storage/interface.js';
+import { createApp } from '../backend/src/app.js';
+import { SqliteStorage } from '../backend/src/storage/sqlite.js';
+import { toPaise, fromPaise, canonicalHash } from '../backend/src/storage/interface.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

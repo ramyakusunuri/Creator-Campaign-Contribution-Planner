@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATELIER 24 — Contemporary Luxury & Modern Indian Essentials</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            serif: ['Playfair Display', 'serif']
+          },
+          colors: {
+            brand: {
+              50: '#f8fafc',
+              900: '#0f172a',
+              950: '#020617'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & Custom CSS -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Canvas Confetti for Order Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-[#fafafa] text-slate-900 antialiased min-h-screen flex flex-col selection:bg-slate-900 selection:text-white">
+
+  <!-- 1. Top Announcement Ticker (India Region) -->
+  <div class="bg-slate-950 text-slate-300 text-xs py-2 px-4 tracking-wide text-center flex items-center justify-center gap-2 border-b border-slate-800">
+    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+    <span>Complimentary Express Delivery across India on orders over <strong>₹1,999</strong></span>
+    <span class="hidden md:inline text-slate-600">|</span>
+    <span class="hidden md:inline">Use Coupons: <strong class="text-white">FASHION20</strong> (20% Off), <strong class="text-white">SAVE10</strong> (₹500 Off), or <strong class="text-white">FREESHIP</strong></span>
+  </div>
+
+  <!-- 2. Main Navigation Bar -->
+  <header class="sticky top-0 z-40 w-full glass-nav border-b border-slate-200/80 transition-all">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-8">
+        <a href="javascript:void(0)" onclick="navigateTo('catalog')" class="flex flex-col group">
+          <span class="font-serif text-2xl sm:text-3xl font-extrabold tracking-widest text-slate-900 group-hover:text-slate-700 transition">ATELIER 24</span>
+          <span class="text-[9px] font-sans font-semibold tracking-[0.25em] text-slate-400 uppercase -mt-1">MUMBAI • NEW DELHI</span>
+        </a>
+
+        <!-- Desktop Category Links -->
+        <nav class="hidden lg:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <button onclick="setCategory('all'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">All Pieces</button>
+          <button onclick="setCategory('fitness'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Fitness Wear</button>
+          <button onclick="setCategory('casual'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Casual Wear</button>
+          <button onclick="setCategory('night'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Night Wear</button>
+          <button onclick="setCategory('party'); navigateTo('catalog')" class="hover:text-slate-900 transition py-2">Party Wear</button>
+        </nav>
+      </div>
+
+      <!-- Live Search Bar -->
+      <div class="hidden sm:flex flex-1 max-w-xs relative">
+        <input 
+          type="text" 
+          id="catalogSearchInput" 
+          placeholder="Search track pants, sports t-shirt, casual jeans, night suit, party dress..." 
+          class="w-full pl-9 pr-4 py-2 bg-slate-100/90 text-xs text-slate-900 placeholder:text-slate-400 rounded-full border border-transparent focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 transition"
+        />
+        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+      </div>
+
+      <!-- Action Utilities (Wishlist, Cart Button, Currency INR) -->
+      <div class="flex items-center gap-3 sm:gap-4">
+        <!-- Currency (INR) -->
+        <div class="hidden sm:flex items-center gap-1 text-xs font-semibold text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50">
+          <span class="text-emerald-700 font-bold">₹</span>
+          <span>INR</span>
+        </div>
+
+        <!-- Wishlist Button -->
+        <button 
+          onclick="showToast('Saved Wishlist', 'You have ' + state.wishlist.length + ' item(s) in your favorites.', 'info')" 
+          class="p-2.5 rounded-full hover:bg-slate-100 text-slate-700 transition relative"
+          title="Wishlist"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          <span id="wishlistBadge" class="hidden absolute top-1 right-1 w-4 h-4 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">0</span>
+        </button>
+
+        <!-- Cart Bag Trigger -->
+        <button 
+          onclick="toggleCartDrawer(true)" 
+          class="flex items-center gap-2.5 py-2 px-3 sm:px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-full text-xs font-semibold transition shadow-sm hover:shadow-md active:scale-95"
+          title="View Shopping Bag"
+        >
+          <div class="relative">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+            </svg>
+            <span class="cart-badge absolute -top-2 -right-2 w-4 h-4 bg-amber-400 text-slate-950 text-[10px] font-bold rounded-full flex items-center justify-center">1</span>
+          </div>
+          <span class="hidden sm:inline">Shopping Bag</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Mobile Navigation Sub-bar -->
+    <div class="lg:hidden flex items-center justify-around py-2 px-4 border-t border-slate-200/60 bg-white/60 text-[11px] font-semibold uppercase tracking-wider text-slate-600 overflow-x-auto">
+      <button onclick="setCategory('all'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">All</button>
+      <button onclick="setCategory('fitness'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Fitness</button>
+      <button onclick="setCategory('casual'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Casual</button>
+      <button onclick="setCategory('night'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Night Wear</button>
+      <button onclick="setCategory('party'); navigateTo('catalog')" class="hover:text-slate-900 px-1 shrink-0">Party Wear</button>
+    </div>
+  </header>
+
+  <!-- MAIN APPLICATION CONTAINER -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- ==========================================
+         VIEW 1: PRODUCT CATALOG VIEW
+         ========================================== -->
+    <div id="catalogView" class="animate-fade-in">
+      
+      <!-- Editorial Hero Banner with High-Resolution Photography -->
+      <section class="relative rounded-3xl overflow-hidden mb-10 shadow-2xl bg-slate-950 text-white min-h-[380px] flex items-center">
+        <!-- Background Photography with Elegant Dark Vignette -->
+        <div class="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105" style="background-image: url('assets/images/banners/hero-festive-capsule.jpg');"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-transparent"></div>
+
+        <div class="relative z-10 max-w-2xl p-8 sm:p-12 lg:p-16">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-xs font-semibold tracking-wider uppercase text-amber-300 mb-4">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            Spring / Festive Capsule 2026 Live
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-serif font-bold tracking-tight leading-tight mb-4 text-white">
+            Contemporary tailoring & modern Indian luxury.
+          </h1>
+          <p class="text-sm sm:text-base text-slate-200 leading-relaxed mb-6 font-light">
+            Designed for urban elegance across Mumbai, Delhi, Bengaluru, and beyond. Explore smart fitness wearables, breathable athletic sportswear, classic denim, cozy cotton sleepwear, and evening party couture.
+          </p>
+          <div class="flex flex-wrap items-center gap-3">
+            <button onclick="setCategory('fitness')" class="px-5 py-2.5 bg-white text-slate-950 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-slate-100 transition shadow">
+              Fitness Wear
+            </button>
+            <button onclick="setCategory('casual')" class="px-5 py-2.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-amber-400 transition shadow">
+              Casual Wear
+            </button>
+            <button onclick="setCategory('night')" class="px-5 py-2.5 bg-slate-800/80 border border-slate-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-slate-800 transition">
+              Night Wear
+            </button>
+            <button onclick="setCategory('party')" class="px-5 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-rose-700 transition">
+              Party Wear
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Promo Code Engine Interactive Bar (INR Region) -->
+      <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-8">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-amber-100 text-amber-900 rounded-xl">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Exclusive Store Offers (Indian Region)</h3>
+              <p class="text-xs text-slate-500">Click any code below to instantly apply the discount to your bag:</p>
+            </div>
+          </div>
+
+          <!-- Promo Code Pills in Rupees -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button 
+              onclick="quickApplyPromo('FASHION20'); toggleCartDrawer(true);" 
+              class="group px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-900 hover:text-white transition flex items-center gap-1.5 text-xs font-mono font-semibold"
+              title="Apply 20% discount"
+            >
+              <span class="text-emerald-600 group-hover:text-emerald-400 font-bold">●</span>
+              <span>FASHION20</span>
+              <span class="text-[11px] font-sans text-slate-500 group-hover:text-slate-300">(20% OFF)</span>
+            </button>
+
+            <button 
+              onclick="quickApplyPromo('SAVE10'); toggleCartDrawer(true);" 
+              class="group px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-900 hover:text-white transition flex items-center gap-1.5 text-xs font-mono font-semibold"
+              title="Apply ₹500 discount"
+            >
+              <span class="text-emerald-600 group-hover:text-emerald-400 font-bold">●</span>
+              <span>SAVE10</span>
+              <span class="text-[11px] font-sans text-slate-500 group-hover:text-slate-300">(FLAT ₹500 OFF)</span>
+            </button>
+
+            <button 
+              onclick="quickApplyPromo('FREESHIP'); toggleCartDrawer(true);" 
+              class="group px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-900 hover:text-white transition flex items-center gap-1.5 text-xs font-mono font-semibold"
+              title="Apply free delivery"
+            >
+              <span class="text-emerald-600 group-hover:text-emerald-400 font-bold">●</span>
+              <span>FREESHIP</span>
+              <span class="text-[11px] font-sans text-slate-500 group-hover:text-slate-300">(FREE DELIVERY)</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Filter Controls & Sorting Toolbar -->
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
+        
+        <!-- Category Filter Tabs -->
+        <div class="flex flex-wrap items-center gap-2" id="categoryFilterContainer">
+          <button onclick="setCategory('all')" data-cat="all" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-slate-900 text-white shadow-sm">All Pieces</button>
+          <button onclick="setCategory('fitness')" data-cat="fitness" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Fitness Wear</button>
+          <button onclick="setCategory('casual')" data-cat="casual" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Casual Wear</button>
+          <button onclick="setCategory('night')" data-cat="night" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Night Wear</button>
+          <button onclick="setCategory('party')" data-cat="party" class="category-btn px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition bg-white border border-slate-200 text-slate-700 hover:border-slate-400">Party Wear</button>
+        </div>
+
+        <!-- Right Side: Count, Price Filter (INR) & Sort Dropdown -->
+        <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+          <span id="productsCount" class="text-xs text-slate-500 font-medium hidden sm:inline">8 items found</span>
+
+          <div class="flex items-center gap-2">
+            <!-- Price Range Filter in INR -->
+            <select 
+              id="priceFilterSelect" 
+              onchange="setPriceFilter(this.value)" 
+              class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:ring-2 focus:ring-slate-900 focus:outline-none"
+            >
+              <option value="all">All Prices</option>
+              <option value="under-1000">Under ₹1,000</option>
+              <option value="1000-1300">₹1,000 – ₹1,300</option>
+              <option value="above-1300">Above ₹1,300</option>
+            </select>
+
+            <!-- Sort By Selector -->
+            <select 
+              id="sortSelect" 
+              onchange="setSortBy(this.value)" 
+              class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:ring-2 focus:ring-slate-900 focus:outline-none"
+            >
+              <option value="featured">Sort: Featured</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="rating">Customer Rating</option>
+              <option value="name">Alphabetical</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Product Catalog Grid -->
+      <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+      <!-- Empty Catalog State -->
+      <div id="emptyCatalogState" class="hidden text-center py-20 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+        <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <h3 class="text-lg font-serif font-bold text-slate-900 mb-1">No products match your criteria</h3>
+        <p class="text-xs text-slate-500 mb-4">Try resetting your filters or search keywords.</p>
+        <button onclick="setCategory('all'); document.getElementById('catalogSearchInput').value=''; applyFilters();" class="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition">Reset All Filters</button>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         VIEW 2: MULTI-STEP CHECKOUT VIEW (INDIA)
+         ========================================== -->
+    <div id="checkoutView" class="hidden animate-fade-in">
+      <div id="checkoutContainer">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 3: ORDER CONFIRMATION VIEW (INDIA)
+         ========================================== -->
+    <div id="confirmationView" class="hidden animate-fade-in">
+      <div id="confirmationContainer">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==========================================
+       SHOPPING BAG / CART SLIDE-OVER DRAWER
+       ========================================== -->
+  <div id="cartBackdrop" onclick="toggleCartDrawer(false)" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 transition-opacity duration-300 opacity-0 hidden"></div>
+
+  <aside id="cartDrawer" class="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-200">
+    
+    <!-- Drawer Header -->
+    <div class="p-5 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+        <h3 class="font-serif font-bold text-lg text-slate-900">Your Shopping Bag</h3>
+        <span class="cart-badge bg-slate-900 text-white text-xs font-bold px-2 py-0.5 rounded-full">1</span>
+      </div>
+      <button onclick="toggleCartDrawer(false)" class="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition" title="Close bag">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Drawer Scrollable Body -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-4">
+      
+      <!-- Cart Items List Container -->
+      <div id="cartDrawerItems" class="space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Empty Cart Message -->
+      <div id="cartDrawerEmpty" class="hidden text-center py-16">
+        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+        </div>
+        <h4 class="font-serif font-bold text-slate-900 text-lg mb-1">Your bag is currently empty</h4>
+        <p class="text-xs text-slate-500 mb-6">Discover trendy apparel, sneakers, and handcrafted leather accessories.</p>
+        <button onclick="toggleCartDrawer(false); navigateTo('catalog')" class="py-2.5 px-6 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition">Explore Collection</button>
+      </div>
+
+      <!-- Summary & Promo Code Section -->
+      <div id="cartDrawerSummary">
+        <!-- Rendered dynamically -->
+      </div>
+
+    </div>
+
+    <!-- Drawer Footer Actions -->
+    <div id="cartDrawerFooter" class="p-5 border-t border-slate-200/80 bg-white space-y-3">
+      <button 
+        onclick="toggleCartDrawer(false); state.checkoutStep = 1; navigateTo('checkout');" 
+        class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition shadow-lg flex items-center justify-center gap-2 group"
+      >
+        <span>Proceed to Checkout</span>
+        <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+      </button>
+
+      <button 
+        onclick="toggleCartDrawer(false)" 
+        class="w-full py-2.5 text-slate-600 hover:text-slate-900 text-xs font-semibold transition"
+      >
+        Continue Browsing
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ==========================================
+       QUICK VIEW & MULTI-IMAGE GALLERY MODAL
+       ========================================== -->
+  <div id="quickViewModal" class="fixed inset-0 z-50 overflow-y-auto hidden opacity-0 transition-opacity duration-200">
+    <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onclick="closeQuickView()"></div>
+    
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+      <div class="relative bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10">
+        <button onclick="closeQuickView()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+
+        <div id="quickViewContent">
+          <!-- Rendered dynamically with thumbnail switching -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MOCK SHIPMENT TRACKING MODAL (INDIA)
+       ========================================== -->
+  <div id="trackingModal" class="fixed inset-0 z-50 overflow-y-auto hidden opacity-0 transition-opacity duration-200">
+    <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onclick="closeTrackingModal()"></div>
+    
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+      <div class="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+          <div>
+            <h3 class="font-serif font-bold text-lg text-slate-900">Shipment Tracking</h3>
+            <p class="text-xs text-slate-500">Order <span id="trackOrderId" class="font-mono font-bold text-slate-900">#ORD-IN84920</span> • BlueDart / Delhivery Air</p>
+          </div>
+          <button onclick="closeTrackingModal()" class="p-2 text-slate-400 hover:text-slate-900 rounded-full">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Tracking Timeline (India) -->
+        <div class="space-y-6 relative pl-6 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+          
+          <div class="relative">
+            <div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] ring-4 ring-white">✓</div>
+            <div class="text-xs font-bold text-slate-900">Order Placed & GST Invoice Issued</div>
+            <div class="text-[11px] text-slate-500">Payment verified via UPI / Bank Network</div>
+          </div>
+
+          <div class="relative">
+            <div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] ring-4 ring-white">✓</div>
+            <div class="text-xs font-bold text-slate-900">Quality Inspection & Eco Packaging</div>
+            <div class="text-[11px] text-slate-500">Central Fulfillment Hub • Bhiwandi / Mumbai</div>
+          </div>
+
+          <div class="relative">
+            <div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center text-[10px] ring-4 ring-white animate-pulse">●</div>
+            <div class="text-xs font-bold text-sky-700">Dispatched via Air Express</div>
+            <div class="text-[11px] text-slate-500">AWB Tracking: <strong>BLUEDART-8829-4109-IN</strong></div>
+          </div>
+
+          <div class="relative opacity-50">
+            <div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] ring-4 ring-white">4</div>
+            <div class="text-xs font-bold text-slate-700">Doorstep Delivery Scheduled</div>
+            <div class="text-[11px] text-slate-500">Estimated Delivery: 2–4 Business Days</div>
+          </div>
+
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-slate-100 flex justify-end">
+          <button onclick="closeTrackingModal()" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition">Close Tracker</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       FLOATING TOAST NOTIFICATION STACK
+       ========================================== -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+    <!-- Toasts injected here -->
+  </div>
+
+  <!-- Footer (India Region) -->
+  <footer class="bg-white border-t border-slate-200 mt-20 pt-12 pb-8 text-xs text-slate-500 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div>
+          <h4 class="font-serif text-base font-bold text-slate-900 mb-3">ATELIER 24 INDIA</h4>
+          <p class="text-xs text-slate-500 leading-relaxed">Contemporary minimalist fashion, structured silhouettes, and ethical craftsmanship across India.</p>
+        </div>
+        <div>
+          <h5 class="font-semibold text-slate-900 uppercase tracking-wider mb-3">Customer Care</h5>
+          <ul class="space-y-2">
+            <li><a href="javascript:void(0)" class="hover:text-slate-900">Pan-India Express Delivery</a></li>
+            <li><a href="javascript:void(0)" class="hover:text-slate-900">Easy 15-Day Doorstep Returns</a></li>
+            <li><a href="javascript:void(0)" class="hover:text-slate-900">Indian Fit & Size Guide</a></li>
+            <li><a href="javascript:void(0)" class="hover:text-slate-900">Live Track Order</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5 class="font-semibold text-slate-900 uppercase tracking-wider mb-3">Coupons & Offers</h5>
+          <ul class="space-y-2">
+            <li><span class="font-mono text-slate-900 font-bold">FASHION20</span>: 20% Off Orders</li>
+            <li><span class="font-mono text-slate-900 font-bold">SAVE10</span>: ₹500 Flat Off</li>
+            <li><span class="font-mono text-slate-900 font-bold">FREESHIP</span>: Free Delivery</li>
+          </ul>
+        </div>
+        <div>
+          <h5 class="font-semibold text-slate-900 uppercase tracking-wider mb-3">Newsletter</h5>
+          <p class="text-xs text-slate-500 mb-2">Subscribe for private seasonal capsule drops & festive previews.</p>
+          <div class="flex gap-2">
+            <input type="email" placeholder="Enter your email..." class="w-full px-3 py-2 bg-slate-100 rounded-lg text-xs focus:outline-none" />
+            <button class="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p>© 2026 ATELIER 24 India Pvt. Ltd. 100% GST Compliant. All mock rights reserved.</p>
+        <div class="flex items-center gap-4">
+          <span>Privacy Policy</span>
+          <span>Terms of Sale</span>
+          <span>Security & Compliance</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Scripts -->
+  <script src="products.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

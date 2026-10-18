@@ -1,78 +1,129 @@
 # Creator Campaign Contribution Planner (Case C24)
 
-A high-performance Node.js application built with native `node:http`, native `node:sqlite` persistence, Server-Sent Events (SSE) streaming, and dual-key security for influencer promo code management and e-commerce checkout integration under a ₹25 lakh budget.
+A high-performance Node.js application built with native `node:http`, native `node:sqlite` persistence, Server-Sent Events (SSE) streaming, and multi-key security for influencer promo code management, creator finding & ranking, and e-commerce checkout integration under a ₹25 lakh budget.
 
-> **Notice:** All creator rosters, brand configurations, and initial planning records are **synthetic sample data**. Monetary figures are in Indian Rupees (**INR / ₹**). Stored in SQLite as integer paise. Unknown discounts remain strictly `null`, never converted to zero.
+> **CRITICAL ARCHITECTURAL NOTICES:**
+> 1. **Single Instance Architecture:** This application runs as a single self-contained instance utilizing local WAL-mode SQLite storage (`node:sqlite`).
+> 2. **Synthetic Data in Demo:** All creator profiles, follower snapshots, historical orders, and brand configurations are **synthetic sample data** generated for testing and demonstration.
+> 3. **Planning Assumptions vs Reality:** 
+>    - Incremental share is a **planning assumption**, not a causal guarantee.
+>    - Promo codes demonstrate **attribution**, not causation.
+> 4. **Committed Keys are Demo Only:** Keys such as `demo-brand-key-b1`, `demo-report-key-b1`, and `demo-agency-key` are committed strictly for demonstration and testing. In production environments, keys must be supplied exclusively through secure environment variables (`BRAND_KEY_*`, `REPORT_KEY_*`, `AGENCY_KEY`).
+> 5. **Security Restrictions:** No HTTP endpoint may ever create simulated data, and there is strictly **no HTTP purge endpoint**.
 
 ---
 
 ## 1. Requirements & Stack
-- **Runtime:** Node.js 22.5.0+ (Node 24 recommended, uses built-in `node:sqlite` DatabaseSync with zero compilation dependencies).
-- **Architecture:** Plain Node.js (`node:http`, `node:crypto`, `node:sqlite`, `node:fs`). Zero third-party web frameworks or runtime dependencies required for promo services.
-- **Frontend:** Vanilla HTML/CSS/JS in `public/` using native `fetch` + stream reader (`ReadableStreamDefaultReader`) with `X-Brand-Key` header authentication.
+- **Runtime:** Node.js 22.5.0+ (uses built-in `node:sqlite` DatabaseSync with zero native compilation dependencies).
+- **Backend Architecture:** Native Node.js HTTP server (`src/app.js`, `src/server.js`) with zero heavy framework bloat.
+- **Frontend:** Next.js with React 19 and Tailwind CSS with custom glassmorphism and real-time SSE stream integration.
+- **Monetary Storage:** Handled exclusively in **integer paise** (`paise = Math.round(inr * 100)`). Stored in SQLite as integer paise. Missing discounts and hidden follower counts remain strictly `null` (UNKNOWN), never converted to zero.
 
 ---
 
-## 2. Running the Application
+## 2. Project Structure
 
-### 1. Start the Native Promo Server & Live Dashboard:
-```bash
-npm run start:promo
-# Or directly:
-node src/server.js
+The project conforms to the official hackathon modular architecture:
+
 ```
-The server will start on [http://localhost:3000](http://localhost:3000) (or configured `PORT`).
+/your-project-root
+├── /c24-main-backend      # The core C24 engine and dashboard
+│   ├── /src               # App router, components, calculation engine, storage
+│   └── package.json
+│
+└── /storefront-app        # Luxury fashion storefront (Atelier 24)
+    ├── /src
+    │   ├── /app           # Storefront pages, cart, catalog & checkout
+    │   └── /api           # Backend proxies (check.js, order.js holding C24_WEBSITE_KEY)
+    ├── .env               # Holds C24_WEBSITE_KEY (never exposed to browser)
+    └── package.json
+```
 
-### 2. Run the E-Commerce Checkout Simulator:
+### Security & Backend Proxy Pattern:
+- **`storefront-app/.env`**: Exclusively stores `C24_WEBSITE_KEY=demo-report-key-b1`, `C24_API_URL`, and `BRAND_ID`.
+- **`storefront-app/src/api/check.js`**: Backend proxy that queries C24 for promo validity and returns only `{ code, valid, reason }` without revealing secrets.
+- **`storefront-app/src/api/order.js`**: Backend proxy that injects `X-Report-Key` server-side when submitting confirmed orders to `/api/v1/orders/report`.
+- **Client Security**: The storefront browser code only ever calls `/api/check` and `/api/order`. The website key is never visible in network request headers, source code, or browser DOM.
+
+
+---
+
+## 3. Running the Application
+
+### 1. Start the Frontend (Next.js Dashboard):
 ```bash
-npm run simulate
-# Or directly:
+npm run dev
+# Or explicitly:
+npm run dev:frontend
+```
+The dashboard will start on [http://localhost:3000](http://localhost:3000).
+
+### 2. Start the Backend (Standalone Native HTTP API Server):
+```bash
+npm run dev:backend
+# Or:
+npm run start:promo
+```
+The backend API server starts on [http://localhost:3001](http://localhost:3001).
+
+### 3. Run the Database Seed Script:
+```bash
+node scripts/seed.js
+```
+Populates baseline creators, creator profiles (YouTube & Instagram), follower snapshots, and active promo codes. Refuses if server is not in `demo` mode.
+
+### 4. Run the E-Commerce Simulator (Phase B9):
+```bash
+# Standard run:
 node scripts/fake-website.js
+
+# With custom repetitions and invalid code injection:
+node scripts/fake-website.js --repeat 3 --bad-code
 ```
 The simulator checks that `/health` is in `demo` mode, tests pre-checkout advisory checks (`GET .../check`), reports paid redemptions (`POST .../redemptions`), and tests idempotency duplicate responses.
 
-### 3. Run the Automated Test Suite:
+### 5. Run the Automated Test Suite:
 ```bash
 npm test
+# Or test backend workspace specifically:
+npm run test:backend
 ```
-Executes all contract and integration test suites:
-- `tests/promoNativeIntegration.test.js`: Full integration suite covering dual-key auth, 1MB payload limits, canonical hashing, unknown discounts, SSE caps, and persistence.
-- `tests/storageContract.test.js`: Identical contract tests across both `SqliteStorage` and `MemoryStorage`.
-- `tests/fakeWebsiteSimulator.test.js`: Health check demo guard and simulation execution.
-- `tests/promoIntegration.test.js`: Baseline C24 mathematical engine and line item accounting.
 
 ---
 
-## 3. Core Architecture & Division of Responsibility
+## 3. Division of Responsibility & Security Model
 
 | Capability | Owned By | Description |
 | :--- | :--- | :--- |
-| **Promo Code Registration** | Brand (C24 Dashboard) | Brand registers the code, influencer association, and validity window. |
-| **Discount Rule & Calculation**| **Website** | The e-commerce website owns all discount logic. C24 does not know or calculate discounts; it records what the website reports. |
-| **Pre-Checkout Advisory Check**| C24 Service | Website asks C24 whether a promo code is registered and valid *right now*. |
-| **Paid Order Reporting** | Website Server | When payment succeeds, website reports order items, paid timestamp, and applied discount to C24. |
-| **Attribution & Live Dashboard**| C24 Service | Stores order in SQLite database, updates campaign metrics, and streams live SSE updates over HTTP. |
+| **Promo Code Registration** | Brand (`X-Brand-Key`) | Brand registers codes, influencer associations, and validity windows. |
+| **Creator Catalog & Ingestion** | Agency (`X-Agency-Key`) | Shared creator profile management and transactional CSV ingestion. |
+| **Creator Shortlisting** | Brand (`X-Brand-Key`) | Brand-scoped creator shortlists with automated rival conflict and exclusion checks. |
+| **Discount Rule & Calculation**| **Website** | E-commerce website owns all discount logic. The planner records reported redemptions. |
+| **Pre-Checkout Advisory Check**| C24 Service (`X-Report-Key`) | Fast check whether a code is valid *right now* without leaking influencer details. |
+| **Paid Order Reporting** | Website Server (`X-Report-Key`) | When payment succeeds, website reports order items, timestamp, and discount. |
+| **Attribution & Live Dashboard**| C24 Service | Stores orders in SQLite, updates campaign metrics, and streams live SSE updates. |
 
 ---
 
-## 4. Dual-Key Authentication & API Endpoints
+## 4. API Endpoints
 
-### Brand Endpoints (`X-Brand-Key: demo-key-b1`)
-- `GET /health`: Server health and environment status (`{ status: "ok", environment: "demo" }`).
-- `GET /brands/:brandId/creators`: Lists creators with brand-specific eligibility and rival conflict checks.
-- `POST /brands/:brandId/promo-codes`: Register promo code with creator and validity dates. Emits `promo_created`.
-- `PATCH /brands/:brandId/promo-codes/:code`: Update validity dates (`valid_from`, `valid_to`). Emits `code_updated`.
-- `GET /brands/:brandId/promo-codes`: List registered promo codes with derived status (`valid`, `not_yet_valid`, `expired`), order counts, units, and gross revenue.
-- `GET /brands/:brandId/promo-codes/:code`: Detailed performance metrics and itemized redemptions.
-- `GET /brands/:brandId/unregistered-uses`: Audit list of reported orders using unregistered codes.
-- `GET /brands/:brandId/feed-status`: Live feed metrics (website count, synthetic seed count, unregistered count, last received).
-- `POST /brands/:brandId/purge-seed`: (Demo only) Purges synthetic seed records.
-- `GET /brands/:brandId/events`: Live Server-Sent Events (SSE) feed. 20 client cap per brand (HTTP 429), 25s heartbeat (`: ping\n\n`).
+### Finder Endpoints (Phase B6)
+- `POST /api/finder/parse-urls`: Strictly non-fetching URL parser for YouTube and Instagram handles.
+- `POST /api/finder/csv`: All-or-nothing transactional CSV ingestion (requires `X-Agency-Key`).
+- `GET /api/finder/creators`: Platform-isolated rankings with "unranked" group for unknown counts and assumption tier thresholds.
 
-### Website Server Endpoints (`X-Report-Key: demo-report-key-b1`)
-- `GET /brands/:brandId/promo-codes/:code/check`: Pre-checkout advisory check. Returns `{ code, valid: true/false, reason: "valid" | "not_found" | "not_yet_valid" | "expired" }`. Never leaks discounts or creator info.
-- `POST /brands/:brandId/promo-codes/:code/redemptions`: Reports paid order. Requires `payment_confirmed_at`, line items, and canonical payload hashing for idempotency (same hash $\rightarrow$ 200 `{ duplicate: true }`, different hash $\rightarrow$ 409 Conflict). Max 1MB body limit.
-- `GET /brands/:brandId/reconciliation`: Reconciles date range $[from, to)$ (max 5,000 items).
+### Brand Endpoints (`X-Brand-Key`)
+- `GET /health`: Health check and environment verification (`{ status: "ok", environment: "demo" }`).
+- `GET /brands/:brandId/shortlist`: Returns brand-scoped shortlist (completely invisible to other brands).
+- `POST /brands/:brandId/shortlist`: Adds creator to shortlist after verifying eligibility and rival relationships.
+- `DELETE /brands/:brandId/shortlist/:creatorId`: Removes creator from brand shortlist.
+- `GET /brands/:brandId/cost-per-unit`: Computes real-time cost per unit sold dynamically on read with integer paise allocation.
+- `GET /brands/:brandId/events`: Live Server-Sent Events (SSE) feed with 20-subscriber cap.
+
+### Website Server Endpoints (`X-Report-Key`)
+- `GET /brands/:brandId/promo-codes/:code/check`: Pre-checkout advisory check.
+- `POST /brands/:brandId/promo-codes/:code/redemptions`: Reports paid order with canonical payload hashing.
+- `GET /brands/:brandId/reconciliation`: Reconciles date range $[from, to)$.
 
 ---
 
@@ -82,4 +133,4 @@ Executes all contract and integration test suites:
 - **Net Contribution:** $\text{pre\_fee\_contribution} - \text{creator\_fee}$
 - **Incremental Contribution:** $(\text{pre\_fee\_contribution} \times \text{incremental\_share}) - \text{creator\_fee}$
 - **Break-Even Incremental Share:** $\text{creator\_fee} / \text{pre\_fee\_contribution}$ (returns `null` if pre-fee contribution $\le 0$)
-- **Data Integrity Rule:** Missing values are strictly treated as **UNKNOWN (`null`)**, never converted to zero.
+- **Cost Per Unit Sold:** $\text{creator\_fee} / \text{units\_sold}$ (allocated per product and code with integer paise exact sum)

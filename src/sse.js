@@ -50,8 +50,8 @@ export class SseHub {
       'Access-Control-Allow-Origin': '*'
     });
 
-    // Send initial comment to establish stream
-    res.write(': connected\n\n');
+    // Send initial comment to establish stream with retry hint
+    res.write('retry: 3000\n: connected\n\n');
 
     subs.add(res);
 
@@ -123,4 +123,13 @@ export class SseHub {
     }
     this.brandSubscribers.clear();
   }
+}
+
+// Preserve shared instance across hot reloads / module re-evaluations
+const globalForSse = globalThis;
+export function getSharedSseHub(options = {}) {
+  if (!globalForSse.__c24_native_sse_hub) {
+    globalForSse.__c24_native_sse_hub = new SseHub(options);
+  }
+  return globalForSse.__c24_native_sse_hub;
 }

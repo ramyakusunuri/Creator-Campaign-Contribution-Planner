@@ -20,8 +20,8 @@ interface BrandContextType {
   setBrandKey: (k: string) => void;
   setReportKey: (k: string) => void;
   setAgencyKey: (k: string) => void;
-  connectionStatus: "connected" | "connecting" | "disconnected";
-  setConnectionStatus: (s: "connected" | "connecting" | "disconnected") => void;
+  connectionStatus: "live" | "reconnecting" | "offline" | "connected" | "connecting" | "disconnected";
+  setConnectionStatus: (s: any) => void;
   feedStatus: FeedStatus | null;
   setFeedStatus: React.Dispatch<React.SetStateAction<FeedStatus | null>>;
   darkMode: boolean;
@@ -30,17 +30,32 @@ interface BrandContextType {
 
 const BrandContext = createContext<BrandContextType | null>(null);
 
+const defaultBrandContext: BrandContextType = {
+  selectedBrand: "B1",
+  brandKey: "b1_secret_key",
+  reportKey: "rep_b1_secret",
+  agencyKey: "demo-agency-key",
+  setSelectedBrand: () => {},
+  setBrandKey: () => {},
+  setReportKey: () => {},
+  setAgencyKey: () => {},
+  connectionStatus: "live",
+  setConnectionStatus: () => {},
+  feedStatus: null,
+  setFeedStatus: () => {},
+  darkMode: false,
+  toggleDarkMode: () => {}
+};
+
 export function useBrand() {
   const ctx = useContext(BrandContext);
-  if (!ctx) throw new Error("useBrand must be used within an AppShell");
-  return ctx;
+  return ctx || defaultBrandContext;
 }
 
 const NAV_ITEMS = [
   { id: "planner", label: "Planner", icon: "▦", href: "#planner", subtitle: "Budget optimization" },
   { id: "finder", label: "Finder", icon: "♙", href: "#finder", subtitle: "Creator discovery & roster" },
   { id: "promo-codes", label: "Promo codes", icon: "🏷", href: "#promo-codes", subtitle: "Registration & tracking" },
-  { id: "live-feed", label: "Live feed", icon: "⚡", href: "#live-feed", subtitle: "Real-time event stream" },
   { id: "cost-per-unit", label: "Cost per unit", icon: "₹", href: "#cost-per-unit", subtitle: "Fee allocation & unit volume" },
   { id: "experiments", label: "Experiments", icon: "✳", href: "#experiments", subtitle: "Scenario modeling" },
   { id: "evidence", label: "Evidence", icon: "🛡", href: "#evidence", subtitle: "Reconciliation & returns" },
@@ -51,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [brandKey, setBrandKey] = useState("b1_secret_key");
   const [reportKey, setReportKey] = useState("rep_b1_secret");
   const [agencyKey, setAgencyKey] = useState("demo-agency-key");
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "disconnected">("connecting");
+  const [connectionStatus, setConnectionStatus] = useState<"live" | "reconnecting" | "offline" | "connected" | "connecting" | "disconnected">("reconnecting");
   const [feedStatus, setFeedStatus] = useState<FeedStatus | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -223,27 +238,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 />
               </div>
 
-              {/* Live SSE Status Badge */}
+              {/* Live SSE Status Badge (Phase F4: Live, Reconnecting, Offline) */}
               <span
+                id="connection-badge"
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                  connectionStatus === "connected"
+                  connectionStatus === "live" || connectionStatus === "connected"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400"
-                    : connectionStatus === "connecting"
+                    : connectionStatus === "reconnecting" || connectionStatus === "connecting"
                     ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400"
                     : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-400"
                 }`}
               >
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    connectionStatus === "connected"
+                    connectionStatus === "live" || connectionStatus === "connected"
                       ? "bg-emerald-500 animate-pulse"
-                      : connectionStatus === "connecting"
-                      ? "bg-amber-500"
+                      : connectionStatus === "reconnecting" || connectionStatus === "connecting"
+                      ? "bg-amber-500 animate-pulse"
                       : "bg-rose-500"
                   }`}
                 />
-                <span className="hidden sm:inline">
-                  {connectionStatus === "connected" ? "Live Connected" : connectionStatus === "connecting" ? "Connecting..." : "Disconnected"}
+                <span className="font-semibold">
+                  {connectionStatus === "live" || connectionStatus === "connected"
+                    ? "Live"
+                    : connectionStatus === "reconnecting" || connectionStatus === "connecting"
+                    ? "Reconnecting"
+                    : "Offline"}
                 </span>
               </span>
 

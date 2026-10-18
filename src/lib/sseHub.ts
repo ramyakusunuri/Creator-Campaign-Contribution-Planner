@@ -49,9 +49,9 @@ class SseHub {
 
     subs.add(subscriber);
 
-    // Initial connection comment
+    // Initial connection comment with retry hint
     try {
-      controller.enqueue(subscriber.encoder.encode(': connected\n\n'));
+      controller.enqueue(subscriber.encoder.encode('retry: 3000\n: connected\n\n'));
     } catch {}
 
     const cleanup = () => {

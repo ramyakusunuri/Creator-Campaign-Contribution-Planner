@@ -1,6 +1,6 @@
 import { test, describe, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { resetDbForTesting, getDb, hashApiKey } from '../src/lib/db.ts';
+import { resetDbForTesting, getDb, hashApiKey } from '../backend/src/lib/db.ts';
 import {
   calculateRetainedSales,
   calculatePreFeeContribution,
@@ -8,12 +8,12 @@ import {
   calculateIncrementalContribution,
   calculateBreakEvenShare,
   round2
-} from '../src/lib/calculator.ts';
-import { validateAndIngestOrder } from '../src/lib/orderIngestion.ts';
-import { processRefund } from '../src/lib/refundProcessor.ts';
-import { derivePromoStatus, checkEligibility } from '../src/lib/promoLogic.ts';
-import { ShopifyAdapter } from '../src/lib/ecommerce/shopifyAdapter.ts';
-import { MockAdapter } from '../src/lib/ecommerce/mockAdapter.ts';
+} from '../backend/src/lib/calculator.ts';
+import { validateAndIngestOrder } from '../backend/src/lib/orderIngestion.ts';
+import { processRefund } from '../backend/src/lib/refundProcessor.ts';
+import { derivePromoStatus, checkEligibility } from '../backend/src/lib/promoLogic.ts';
+import { ShopifyAdapter } from '../backend/src/lib/ecommerce/shopifyAdapter.ts';
+import { MockAdapter } from '../backend/src/lib/ecommerce/mockAdapter.ts';
 import crypto from 'node:crypto';
 
 describe('C24 Promo-Code & E-Commerce Integration Test Suite', () => {

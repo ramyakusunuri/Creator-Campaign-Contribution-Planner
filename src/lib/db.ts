@@ -2,9 +2,50 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { runMigrations, LATEST_SCHEMA_VERSION } from './migrations.ts';
 
 let dbInstance: DatabaseSync | null = null;
+
+function resolveWorkspaceDataDir(): string {
+  // Check upwards from cwd first
+  let candidate = process.cwd();
+  for (let i = 0; i < 4; i++) {
+    const pkgPath = path.join(candidate, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (pkg.name === 'creator-campaign-contribution-planner') {
+          return path.join(candidate, 'data');
+        }
+      } catch {}
+    }
+    const parent = path.dirname(candidate);
+    if (parent === candidate) break;
+    candidate = parent;
+  }
+
+  // Check upwards from import.meta.url
+  try {
+    let metaCandidate = path.dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 5; i++) {
+      const pkgPath = path.join(metaCandidate, 'package.json');
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          if (pkg.name === 'creator-campaign-contribution-planner') {
+            return path.join(metaCandidate, 'data');
+          }
+        } catch {}
+      }
+      const parent = path.dirname(metaCandidate);
+      if (parent === metaCandidate) break;
+      metaCandidate = parent;
+    }
+  } catch {}
+
+  return path.resolve(process.cwd(), 'data');
+}
 
 export function getDbPath(): string {
   const isProd = process.env.APP_ENV === 'production';
@@ -17,7 +58,7 @@ export function getDbPath(): string {
   if (process.env.DATABASE_PATH) {
     return process.env.DATABASE_PATH;
   }
-  const dataDir = path.resolve(process.cwd(), 'data');
+  const dataDir = resolveWorkspaceDataDir();
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -58,7 +99,7 @@ export function resetDbForTesting(inMemory = true): DatabaseSync {
     } catch {}
     dbInstance = null;
   }
-  process.env.DATABASE_PATH = inMemory ? ':memory:' : path.join(process.cwd(), 'data', 'test.db');
+  process.env.DATABASE_PATH = inMemory ? ':memory:' : path.join(resolveWorkspaceDataDir(), 'test.db');
   return getDb();
 }
 
@@ -81,8 +122,8 @@ function seedReferenceData(db: DatabaseSync): void {
     insertBrand.run('B2', 'Brand Zenith (Synthetic)', hashApiKey('b2_secret_key'), 'whsec_b2_test_secret', 'generic', JSON.stringify(['B1']));
   }
 
-  const creatorCount = (db.prepare('SELECT COUNT(*) as cnt FROM creators;').get() as { cnt: number }).cnt;
-  if (creatorCount === 0) {
+  const cr1Exists = db.prepare("SELECT 1 FROM creators WHERE creator_id = 'CR1';").get();
+  if (!cr1Exists) {
     const insertCreator = db.prepare(`
       INSERT INTO creators (
         creator_id, name, category, excluded, relationships,

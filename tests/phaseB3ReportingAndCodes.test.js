@@ -1,11 +1,11 @@
 import { test, describe, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getDb, resetDbForTesting } from '../src/lib/db.ts';
-import { POST as registerPromo, GET as listPromos } from '../src/app/api/brands/[brandId]/promo-codes/route.ts';
-import { PATCH as patchPromo, DELETE as deletePromo } from '../src/app/api/brands/[brandId]/promo-codes/[code]/route.ts';
-import { GET as checkCodeV1 } from '../src/app/api/v1/codes/check/route.ts';
-import { POST as reportOrderV1 } from '../src/app/api/v1/orders/report/route.ts';
-import { validateAndIngestOrder } from '../src/lib/orderIngestion.ts';
+import { getDb, resetDbForTesting } from '../backend/src/lib/db.ts';
+import { POST as registerPromo, GET as listPromos } from '../frontend/src/app/api/brands/[brandId]/promo-codes/route.ts';
+import { PATCH as patchPromo, DELETE as deletePromo } from '../frontend/src/app/api/brands/[brandId]/promo-codes/[code]/route.ts';
+import { GET as checkCodeV1 } from '../frontend/src/app/api/v1/codes/check/route.ts';
+import { POST as reportOrderV1 } from '../frontend/src/app/api/v1/orders/report/route.ts';
+import { validateAndIngestOrder } from '../backend/src/lib/orderIngestion.ts';
 
 describe('Backend Phase B3: Promo Codes & Paid-Use Reporting Test Suite', () => {
   before(() => {

@@ -1,9 +1,9 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { getDb, resetDbForTesting } from '../src/lib/db.ts';
-import { validateAndIngestOrder } from '../src/lib/orderIngestion.ts';
-import { processRefund } from '../src/lib/refundProcessor.ts';
-import { getSseHub } from '../src/lib/sseHub.ts';
+import { getDb, resetDbForTesting } from '../backend/src/lib/db.ts';
+import { validateAndIngestOrder } from '../backend/src/lib/orderIngestion.ts';
+import { processRefund } from '../backend/src/lib/refundProcessor.ts';
+import { getSseHub } from '../backend/src/lib/sseHub.ts';
 
 describe('Phase 2 Reconciliation & Live Feed Integration Test Suite', () => {
   before(() => {

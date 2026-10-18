@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useBrand } from "@/components/AppShell";
 import { formatINR, formatINRWithPaise, shortINR, renderOrUnknown, formatIST, formatISTDateOnly } from "@/lib/formatters";
 import { api, ApiError } from "@/lib/apiClient";
@@ -136,6 +136,7 @@ export default function Home() {
   const {
     selectedBrand,
     brandKey,
+    reportKey,
     agencyKey,
     setConnectionStatus,
     feedStatus,
@@ -154,6 +155,32 @@ export default function Home() {
   const [unregisteredOrders, setUnregisteredOrders] = useState<UnregisteredOrder[]>([]);
   const [recentEvents, setRecentEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Live feed stream controls
+  const [isStreamPaused, setIsStreamPaused] = useState(false);
+  const isStreamPausedRef = useRef(false);
+  useEffect(() => {
+    isStreamPausedRef.current = isStreamPaused;
+  }, [isStreamPaused]);
+  const [feedFilter, setFeedFilter] = useState("all");
+
+  // Pre-checkout advisory tester
+  const [testCodeInput, setTestCodeInput] = useState("");
+  const [testCodeResult, setTestCodeResult] = useState<{ code: string; valid: boolean; reason: string } | null>(null);
+  const [isTestingCode, setIsTestingCode] = useState(false);
+
+  // Promo code filter
+  const [promoStatusFilter, setPromoStatusFilter] = useState<string>("all");
+
+  // Reconciliation state
+  const defaultReconFrom = toISTISOString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const defaultReconTo = toISTISOString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const [reconFrom, setReconFrom] = useState(defaultReconFrom);
+  const [reconTo, setReconTo] = useState(defaultReconTo);
+  const [reconData, setReconData] = useState<any>(null);
+  const [loadingRecon, setLoadingRecon] = useState(false);
+  const [reconError, setReconError] = useState<string | null>(null);
+  const [expandedReconCodes, setExpandedReconCodes] = useState<Record<string, boolean>>({});
 
   // Promo Code Registration Form
   const now = new Date();
@@ -174,6 +201,44 @@ export default function Home() {
   const [editValidTo, setEditValidTo] = useState("");
   const [editStatusMsg, setEditStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleTestCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testCodeInput.trim()) return;
+    setIsTestingCode(true);
+    setTestCodeResult(null);
+    try {
+      const code = testCodeInput.trim().toUpperCase();
+      const res = await api.get<any>(`/api/brands/${selectedBrand}/promo-codes/${code}/check`, {
+        keyRole: "report",
+        apiKey: reportKey
+      });
+      setTestCodeResult(res);
+    } catch (err: any) {
+      setTestCodeResult({ code: testCodeInput.toUpperCase(), valid: false, reason: err.message || "Failed" });
+    } finally {
+      setIsTestingCode(false);
+    }
+  };
+
+  const executeReconciliation = async (fromVal?: string, toVal?: string) => {
+    const f = fromVal || reconFrom;
+    const t = toVal || reconTo;
+    setLoadingRecon(true);
+    setReconError(null);
+    try {
+      const data = await api.get<any>(`/api/brands/${selectedBrand}/reconciliation?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`, {
+        keyRole: "brand",
+        apiKey: brandKey
+      });
+      setReconData(data);
+    } catch (err: any) {
+      setReconError(err.message || "Reconciliation query failed");
+      setReconData(null);
+    } finally {
+      setLoadingRecon(false);
+    }
+  };
 
   // Fetch full brand data
   const refreshBrandData = async (brandId: string, key: string) => {
@@ -314,7 +379,9 @@ export default function Home() {
                   event: eventType,
                   payload: parsed
                 };
-                setRecentEvents((prev) => [newEvent, ...prev.slice(0, 19)]);
+                if (!isStreamPausedRef.current) {
+                  setRecentEvents((prev) => [newEvent, ...prev.slice(0, 29)]);
+                }
                 refreshBrandData(selectedBrand, brandKey);
 
                 if (activePromoModal && (parsed.code === activePromoModal || parsed.promo_code === activePromoModal)) {
@@ -700,9 +767,79 @@ export default function Home() {
           </div>
         </form>
 
+        {/* Pre-checkout Advisory Check Tester */}
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                  🔍
+                </span>
+                <h4 className="text-sm font-bold">E-Commerce Checkout Advisory Tester (<code>GET .../check</code>)</h4>
+              </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Simulates pre-checkout validation with <code>X-Report-Key</code>. Returns eligibility without leaking confidential margins or creator identities.
+              </p>
+            </div>
+            <span className="font-mono text-[11px] text-slate-400">Auth: X-Report-Key</span>
+          </div>
+
+          <form onSubmit={handleTestCode} className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="e.g. SUMMER25, AARAV10..."
+              value={testCodeInput}
+              onChange={(e) => setTestCodeInput(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs uppercase outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-900"
+            />
+            <button
+              type="submit"
+              disabled={isTestingCode}
+              className="rounded-xl bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-700"
+            >
+              {isTestingCode ? "Checking..." : "Test Advisory Check"}
+            </button>
+            {testCodeResult && (
+              <div className={`flex items-center gap-2 rounded-xl px-3 py-1 text-xs font-semibold ${
+                testCodeResult.valid
+                  ? "border border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
+                  : "border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300"
+              }`}>
+                <span>{testCodeResult.valid ? "✓ Valid for Checkout" : "✗ Ineligible"}</span>
+                <span className="font-mono text-[10px] opacity-75">
+                  ({testCodeResult.reason}) · No margins or creator leaked
+                </span>
+              </div>
+            )}
+          </form>
+        </div>
+
         {/* Registered Codes Table */}
         <div className="mt-8 border-t border-slate-100 pt-6 dark:border-slate-800">
-          <h3 className="text-lg font-bold">Registered Promo Codes ({registeredPromos.length})</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-bold">Registered Promo Codes ({registeredPromos.length})</h3>
+            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold dark:bg-slate-800">
+              {[
+                { id: "all", label: "All" },
+                { id: "valid", label: "Active" },
+                { id: "not_yet_valid", label: "Scheduled" },
+                { id: "expired", label: "Expired" }
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setPromoStatusFilter(filter.id)}
+                  className={`rounded-lg px-2.5 py-1 transition-all ${
+                    promoStatusFilter === filter.id
+                      ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-400"
+                      : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
@@ -717,7 +854,9 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {registeredPromos.map((p) => (
+                {registeredPromos
+                  .filter((p) => promoStatusFilter === "all" || p.status === promoStatusFilter)
+                  .map((p) => (
                   <tr key={p.code} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
                     <td className="py-3 font-mono font-bold text-indigo-700 dark:text-indigo-400">{p.code}</td>
                     <td className="py-3">{p.creator_id}</td>
@@ -757,10 +896,10 @@ export default function Home() {
                     </td>
                   </tr>
                 ))}
-                {registeredPromos.length === 0 && (
+                {registeredPromos.filter((p) => promoStatusFilter === "all" || p.status === promoStatusFilter).length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-400">
-                      No promo codes registered for this brand yet. Register one above to begin tracking live checkout redemptions.
+                      No promo codes match this filter. Register one above to begin tracking live checkout redemptions.
                     </td>
                   </tr>
                 )}
@@ -772,20 +911,93 @@ export default function Home() {
 
       {/* SECTION 4: LIVE FEED (#live-feed) */}
       <section id="live-feed" className="rounded-2xl border border-slate-200 bg-slate-900 p-5 sm:p-6 text-white dark:border-slate-800">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className={`h-2.5 w-2.5 rounded-full ${isStreamPaused ? "bg-amber-400" : "bg-emerald-400 animate-ping"}`} />
             <h3 className="font-bold text-sm text-slate-100">Section 4: Live Ingestion Event Stream</h3>
+            {isStreamPaused && (
+              <span className="rounded bg-amber-900/60 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                PAUSED
+              </span>
+            )}
           </div>
-          <span className="text-xs text-slate-400">Streamed via fetch + ReadableStream (X-Brand-Key)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsStreamPaused((p) => !p)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                isStreamPaused
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                  : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+              }`}
+            >
+              {isStreamPaused ? "▶ Resume Stream" : "⏸ Pause Stream"}
+            </button>
+            <button
+              onClick={() => setRecentEvents([])}
+              className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+            >
+              Clear Feed
+            </button>
+            <span className="text-[11px] font-mono text-slate-500">X-Brand-Key</span>
+          </div>
         </div>
+
+        {/* Live Feed Status Bar */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-800/50 p-2.5 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-4">
+            <span>Last Activity: <strong className="text-slate-200">{feedStatus?.last_use_received_at ? formatIST(feedStatus.last_use_received_at) : "None yet"}</strong></span>
+            <span>Website Reports: <strong className="text-emerald-400">{feedStatus?.uses_by_source?.website ?? 0}</strong></span>
+            <span>Synthetic: <strong className="text-slate-300">{feedStatus?.uses_by_source?.synthetic_seed ?? 0}</strong></span>
+            {(feedStatus?.unregistered_uses ?? 0) > 0 && (
+              <span>Unregistered Attempts: <strong className="text-rose-400">{feedStatus?.unregistered_uses}</strong></span>
+            )}
+          </div>
+          {/* Event Filter Pills */}
+          <div className="flex items-center gap-1 rounded-lg bg-slate-800 p-0.5 text-[11px]">
+            {[
+              { id: "all", label: "All" },
+              { id: "orders", label: "Orders" },
+              { id: "unregistered", label: "Unregistered" },
+              { id: "promos", label: "Promos" }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFeedFilter(f.id)}
+                className={`rounded px-2 py-0.5 ${
+                  feedFilter === f.id
+                    ? "bg-indigo-600 text-white font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-3 max-h-56 space-y-2 overflow-y-auto font-mono text-xs">
-          {recentEvents.length === 0 ? (
+          {recentEvents
+            .filter((ev) => {
+              if (feedFilter === "all") return true;
+              if (feedFilter === "orders") return ev.event === "use_recorded";
+              if (feedFilter === "unregistered") return ev.event === "unregistered_use_recorded";
+              if (feedFilter === "promos") return ev.event === "promo_created" || ev.event === "promo_updated";
+              return true;
+            })
+            .length === 0 ? (
             <p className="py-8 text-center text-slate-500">
               Awaiting live checkout orders or events from the website / simulator...
             </p>
           ) : (
-            recentEvents.map((ev) => (
+            recentEvents
+              .filter((ev) => {
+                if (feedFilter === "all") return true;
+                if (feedFilter === "orders") return ev.event === "use_recorded";
+                if (feedFilter === "unregistered") return ev.event === "unregistered_use_recorded";
+                if (feedFilter === "promos") return ev.event === "promo_created" || ev.event === "promo_updated";
+                return true;
+              })
+              .map((ev) => (
               <div key={ev.id} className="flex items-start justify-between gap-3 rounded-xl bg-slate-800/80 p-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
@@ -965,34 +1177,329 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECTION 7: EVIDENCE (#evidence) */}
+      {/* SECTION 7: EVIDENCE & RECONCILIATION (#evidence) */}
       <section id="evidence" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
-        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
-          Section 7: Evidence
-        </span>
-        <h2 className="mt-2 text-xl font-bold">Contribution Calculation Formulation & Returns Attribution</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Formulation rules implemented in the backend, accounting for partial refunds and cancellations.
-        </p>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-            <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Retained Sales</p>
-            <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
-              <code>retained_orders = eligible_orders - full_returns</code><br />
-              <code>sales = (retained_orders × aov × (1 - discount)) - partial_refunds</code>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5 dark:border-slate-800">
+          <div>
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+              Section 7: Evidence & Reconciliation
+            </span>
+            <h2 className="mt-2 text-xl font-bold">Financial Reconciliation & Audit Trail</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Authoritatively reconciles website checkout transactions against influencer attributed orders with integer paise precision.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-            <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Pre-Fee Contribution</p>
-            <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
-              <code>pre_fee_contrib = retained_sales × margin_pct</code>
-            </p>
+          <span className="font-mono text-xs text-slate-400">Auth: X-Brand-Key / X-Report-Key</span>
+        </div>
+
+        {/* Date Range Query Controls */}
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              Reconciliation Audit Window (ISO 8601 with IST Timezone)
+            </h4>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const f = toISTISOString(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+                  const t = toISTISOString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+                  setReconFrom(f);
+                  setReconTo(t);
+                  executeReconciliation(f, t);
+                }}
+                className="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Last 7 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const f = toISTISOString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+                  const t = toISTISOString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+                  setReconFrom(f);
+                  setReconTo(t);
+                  executeReconciliation(f, t);
+                }}
+                className="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Last 30 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const f = "2026-01-01T00:00:00+05:30";
+                  const t = "2026-12-31T23:59:59+05:30";
+                  setReconFrom(f);
+                  setReconTo(t);
+                  executeReconciliation(f, t);
+                }}
+                className="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Year 2026
+              </button>
+            </div>
           </div>
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-            <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Net Contribution</p>
-            <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
-              <code>net_contrib = pre_fee_contrib - creator_fee</code>
-            </p>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">From Timestamp:</label>
+              <input
+                type="text"
+                value={reconFrom}
+                onChange={(e) => setReconFrom(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-900"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">To Timestamp:</label>
+              <input
+                type="text"
+                value={reconTo}
+                onChange={(e) => setReconTo(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-900"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => executeReconciliation()}
+                disabled={loadingRecon}
+                className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {loadingRecon ? "Reconciling..." : "Run Audit Reconciliation →"}
+              </button>
+            </div>
+          </div>
+
+          {reconError && (
+            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+              Error: {reconError}
+            </div>
+          )}
+        </div>
+
+        {/* Reconciliation Results Section */}
+        {reconData && (
+          <div className="mt-6 space-y-6">
+            {/* Summary KPI Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <span className="text-xs text-slate-500">Reported Orders</span>
+                <p className="mt-2 text-2xl font-bold">{reconData.summary.total_orders}</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {reconData.summary.registered_orders_count} registered · {reconData.summary.unregistered_orders_count} unregistered
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <span className="text-xs text-slate-500">Gross Attributed Revenue</span>
+                <p className="mt-2 text-2xl font-bold">{formatINR(reconData.summary.gross_subtotal_inr)}</p>
+                <p className="mt-1 text-[11px] font-mono text-slate-500">
+                  {reconData.summary.gross_subtotal_paise?.toLocaleString()} paise
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <span className="text-xs text-slate-500">Total Discounts</span>
+                <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {formatINR(reconData.summary.total_discount_inr)}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Net: {formatINR(reconData.summary.net_total_inr)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <span className="text-xs text-slate-500">Refunds & Discrepancies</span>
+                <p className="mt-2 text-2xl font-bold text-rose-600 dark:text-rose-400">
+                  {formatINR(reconData.summary.refund_amount_inr)}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {reconData.summary.refund_events_count} returns · {reconData.summary.discrepancies_count} discrepancies
+                </p>
+              </div>
+            </div>
+
+            {/* Reconciled Promo Code Table */}
+            <div className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+              <h4 className="text-sm font-bold">Registered Promo Attributions ({reconData.registered_codes?.length || 0})</h4>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 uppercase text-slate-500 dark:border-slate-700">
+                      <th className="py-2.5">Promo Code</th>
+                      <th className="py-2.5 text-right">Orders</th>
+                      <th className="py-2.5 text-right">Units</th>
+                      <th className="py-2.5 text-right">Subtotal (INR)</th>
+                      <th className="py-2.5 text-right">Subtotal (Paise)</th>
+                      <th className="py-2.5 text-right">Audit Trail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reconData.registered_codes?.map((r: any) => {
+                      const isExpanded = expandedReconCodes[r.code];
+                      return (
+                        <React.Fragment key={r.code}>
+                          <tr className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                            <td className="py-2.5 font-mono font-bold text-indigo-700 dark:text-indigo-400">{r.code}</td>
+                            <td className="py-2.5 text-right font-semibold">{r.use_count}</td>
+                            <td className="py-2.5 text-right">{r.units}</td>
+                            <td className="py-2.5 text-right font-medium">{formatINR(r.subtotal_inr)}</td>
+                            <td className="py-2.5 text-right font-mono text-slate-500">{r.subtotal_paise?.toLocaleString()}</td>
+                            <td className="py-2.5 text-right">
+                              <button
+                                onClick={() =>
+                                  setExpandedReconCodes((prev) => ({
+                                    ...prev,
+                                    [r.code]: !prev[r.code]
+                                  }))
+                                }
+                                className="rounded px-2 py-1 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950"
+                              >
+                                {isExpanded ? "Hide Orders ▲" : `Inspect (${r.order_ids?.length || 0}) ▼`}
+                              </button>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr className="bg-slate-50/70 dark:bg-slate-800/40">
+                              <td colSpan={6} className="p-3">
+                                <p className="font-semibold text-slate-600 dark:text-slate-400">Attributed Order IDs:</p>
+                                <div className="mt-1 flex flex-wrap gap-1.5 font-mono text-[11px]">
+                                  {r.order_ids?.map((id: string) => (
+                                    <span key={id} className="rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                      {id}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                    {(!reconData.registered_codes || reconData.registered_codes.length === 0) && (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-center text-slate-400">
+                          No registered promo orders in this date range.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Unregistered Uses List */}
+            {reconData.unregistered_uses?.length > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-600 dark:text-amber-400">⚠️</span>
+                  <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300">
+                    Unregistered Codes Attempted ({reconData.unregistered_uses.length})
+                  </h4>
+                </div>
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                  Orders placed with codes not registered for this brand. Tracked separately to ensure creator contribution integrity is never distorted.
+                </p>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-amber-200/60 uppercase text-amber-800 dark:border-amber-900 dark:text-amber-400">
+                        <th className="py-2">Order ID</th>
+                        <th className="py-2">Entered Code</th>
+                        <th className="py-2">Timestamp (IST)</th>
+                        <th className="py-2 text-right">Units</th>
+                        <th className="py-2 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reconData.unregistered_uses.map((u: any) => (
+                        <tr key={u.order_id} className="border-b border-amber-100/60 dark:border-amber-900/40">
+                          <td className="py-2 font-mono font-bold">{u.order_id}</td>
+                          <td className="py-2 font-mono text-amber-700 dark:text-amber-300">{u.code_entered}</td>
+                          <td className="py-2">{formatIST(u.used_at)}</td>
+                          <td className="py-2 text-right">{u.units}</td>
+                          <td className="py-2 text-right font-medium">{formatINR(u.subtotal_inr)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Refund Deductions Log */}
+            {reconData.refunds?.length > 0 && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/30 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
+                <div className="flex items-center gap-2">
+                  <span className="text-rose-600 dark:text-rose-400">↩</span>
+                  <h4 className="text-sm font-bold text-rose-900 dark:text-rose-300">
+                    Refund & Returns Audit Log ({reconData.refunds.length})
+                  </h4>
+                </div>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-rose-200/60 uppercase text-rose-800 dark:border-rose-900 dark:text-rose-400">
+                        <th className="py-2">Refund ID</th>
+                        <th className="py-2">Order ID</th>
+                        <th className="py-2">Processed (IST)</th>
+                        <th className="py-2">Type</th>
+                        <th className="py-2 text-right">Refund Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reconData.refunds.map((ref: any) => (
+                        <tr key={ref.refund_id} className="border-b border-rose-100/60 dark:border-rose-900/40">
+                          <td className="py-2 font-mono font-bold">{ref.refund_id}</td>
+                          <td className="py-2 font-mono">{ref.order_id}</td>
+                          <td className="py-2">{formatIST(ref.created_at)}</td>
+                          <td className="py-2">
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                              ref.is_full_refund ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            }`}>
+                              {ref.is_full_refund ? "Full Return" : "Partial Refund"}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right font-bold text-rose-700 dark:text-rose-300">
+                            {formatINR(ref.amount_inr)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mathematical Formulation Reference Cards */}
+        <div className="mt-8 border-t border-slate-100 pt-6 dark:border-slate-800">
+          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            Authoritative C24 Net Contribution Formulation Rules
+          </h4>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Enforced across all backend queries and reconciliation reconcilers:
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+              <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Retained Sales</p>
+              <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+                <code>retained_orders = eligible_orders - full_returns</code><br />
+                <code>sales = (retained_orders × aov × (1 - discount)) - partial_refunds</code>
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+              <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Pre-Fee Contribution</p>
+              <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+                <code>pre_fee_contrib = retained_sales × margin_pct</code>
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+              <p className="font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">Net Contribution</p>
+              <p className="mt-1 text-xs text-slate-600 leading-relaxed dark:text-slate-300">
+                <code>net_contrib = pre_fee_contrib - creator_fee</code>
+              </p>
+            </div>
           </div>
         </div>
       </section>

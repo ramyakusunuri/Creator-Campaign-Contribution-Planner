@@ -14,9 +14,11 @@ interface FeedStatus {
 interface BrandContextType {
   selectedBrand: string;
   brandKey: string;
+  reportKey: string;
   agencyKey: string;
   setSelectedBrand: (b: string) => void;
   setBrandKey: (k: string) => void;
+  setReportKey: (k: string) => void;
   setAgencyKey: (k: string) => void;
   connectionStatus: "connected" | "connecting" | "disconnected";
   setConnectionStatus: (s: "connected" | "connecting" | "disconnected") => void;
@@ -47,6 +49,7 @@ const NAV_ITEMS = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [selectedBrand, setSelectedBrand] = useState("B1");
   const [brandKey, setBrandKey] = useState("b1_secret_key");
+  const [reportKey, setReportKey] = useState("rep_b1_secret");
   const [agencyKey, setAgencyKey] = useState("demo-agency-key");
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "disconnected">("connecting");
   const [feedStatus, setFeedStatus] = useState<FeedStatus | null>(null);
@@ -83,6 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handleBrandChange = (brand: string) => {
     setSelectedBrand(brand);
     setBrandKey(brand === "B1" ? "b1_secret_key" : "b2_secret_key");
+    setReportKey(brand === "B1" ? "rep_b1_secret" : "rep_b2_secret");
   };
 
   return (
@@ -90,9 +94,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       value={{
         selectedBrand,
         brandKey,
+        reportKey,
         agencyKey,
         setSelectedBrand: handleBrandChange,
         setBrandKey,
+        setReportKey,
         setAgencyKey,
         connectionStatus,
         setConnectionStatus,

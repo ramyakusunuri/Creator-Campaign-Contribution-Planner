@@ -1,7 +1,7 @@
 import type { Creator } from "./creators";
 
 export type Order = { customer:string; item:string; price:number; status:"Delivered"|"Shipped"|"Returned" };
-export type Product = { item:string; price:number; cost:number; influencerCost:number };
+export type Product = { item:string; price:number; cost:number };
 
 const FIRST=["Ram","Sita","Amit","Neha","Raj","Pooja","Karan","Anil","Riya","Sahil"];
 // Sample catalogue: price multiplier relative to the creator's discounted average selling price.
@@ -12,8 +12,8 @@ function rng(seed:number){return()=>{seed|=0;seed=(seed+0x6d2b79f5)|0;let t=Math
 
 // Influencer cost per product = total amount paid to the influencer / number of orders placed with their code.
 export function productsFor(c:Creator):Product[]{
- const base=c.sp*(1-c.discount/100);const cpRate=c.cp/base;const influencerCost=Math.round(c.fee/c.orders);
- return CATALOGUE.map(([item,m])=>{const price=Math.round(base*m/10)*10;return{item,price,cost:Math.round(price*cpRate),influencerCost};});
+ const base=c.sp*(1-c.discount/100);const cpRate=base>0?c.cp/base:0;
+ return CATALOGUE.map(([item,m])=>{const price=Math.round(base*m/10)*10;return{item,price,cost:Math.round(price*cpRate)};});
 }
 
 // SAMPLE orders placed with this creator's coupon (deterministic per creator). Replace with real order data.
@@ -30,7 +30,7 @@ export function statsFor(c:Creator,orders:Order[]){
  const total=orders.length;const returned=orders.filter(o=>o.status==="Returned").length;
  const totalSale=orders.reduce((s,o)=>s+o.price,0);
  // Net profit: kept orders only, after product cost and the influencer cost per product.
- const netProfit=orders.filter(o=>o.status!=="Returned").reduce((s,o)=>{const p=byItem.get(o.item)!;return s+o.price-p.cost-p.influencerCost;},0);
+ const netProfit=orders.filter(o=>o.status!=="Returned").reduce((s,o)=>{const p=byItem.get(o.item)!;return s+o.price-p.cost-(c.orders>0?c.fee/c.orders:0);},0);
  const counts=new Map<string,number>();orders.forEach(o=>counts.set(o.customer,(counts.get(o.customer)??0)+1));
  const reorder=Array.from(counts.values()).filter(n=>n>1).length;
  return{total,returned,totalSale,netProfit,returnRate:total?(returned/total)*100:0,aov:total?totalSale/total:0,reorder};

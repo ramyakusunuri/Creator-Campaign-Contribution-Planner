@@ -16,6 +16,7 @@ const financials = [
 ];
 export const initialCreators:Creator[] = financials.map((f,i)=>({id:i+1,slug:seed[i].id,name:seed[i].name,category:seed[i].niche,...f}));
 export const categories = Array.from(new Set(initialCreators.map(c=>c.category)));
+<<<<<<< HEAD
 export const getCreator=(slug:string)=>{
   if(!slug) return undefined;
   const norm=slug.toLowerCase();
@@ -34,6 +35,10 @@ export const getPersona=(slug:string)=>{
   }
   return seed.find(p=>p.id===slug||p.id.toLowerCase()===norm);
 };
+=======
+export const getCreator=(slug:string)=>initialCreators.find(c=>c.slug===slug);
+export const getPersona=(slug:string)=>seed.find(p=>p.id===slug);
+>>>>>>> 645e923d9db1ddd99aa786db5a42fc0827f40359
 export function profit(c:Creator){return c.orders*(c.sp*(1-c.discount/100)-c.cp)-c.fee;}
 // Coupon code is derived (not in the JSON): FIRSTNAME + discount %.
 export const couponFor=(c:Creator)=>`${c.name.split(" ")[0].toUpperCase()}${c.discount}`;

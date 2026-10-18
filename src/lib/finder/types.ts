@@ -8,6 +8,17 @@ export type FoundCreator = {
   niche: string;
   profileUrl: string;
   fetchedAt: string; // ISO date, used to expire stored data
+<<<<<<< HEAD
+=======
+  demoId?: string;
+  displayName?: string;
+  estimatedRate?: number;
+  monthlyOrders?: number;
+  averageOrderValue?: number;
+  productCostRate?: number;
+  growthRate?: number;
+  isDemo?: boolean;
+>>>>>>> 645e923d9db1ddd99aa786db5a42fc0827f40359
 };
 
 export class FinderError extends Error {

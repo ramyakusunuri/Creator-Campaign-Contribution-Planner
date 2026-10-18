@@ -55,5 +55,4 @@ export async function fetchPersona(slug: string): Promise<PersonaLite | null> {
     }
   } catch {}
   const p = seed.find(x => x.id === slug);
-  return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers as Record<string, number> } : null;
-}
+  return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers Expected '}', got '<eof>'

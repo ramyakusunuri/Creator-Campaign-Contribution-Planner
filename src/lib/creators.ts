@@ -24,12 +24,26 @@ export const couponFor=(c:Creator)=>`${c.name.split(" ")[0].toUpperCase()}${c.di
 
 export const DEFAULT_BUDGET=2_500_000;
 export const BUDGET_KEY="campaign-budget";
-export function optimize(creators:Creator[],budget:number){let bestMask=0,bestProfit=0,bestSpend=0;for(let mask=1;mask<(1<<creators.length);mask++){let spend=0,total=0;for(let i=0;i<creators.length;i++)if(mask&(1<<i)){spend+=creators[i].fee;total+=profit(creators[i]);}if(spend<=budget&&total>bestProfit){bestMask=mask;bestProfit=total;bestSpend=spend;}}return{creators:creators.filter((_,i)=>bestMask&(1<<i)),profit:bestProfit,spend:bestSpend};}
+export const MAX_OPTIMIZED_CREATORS = 20;
+
+// Exact subset search is exponential. Keep it within a safe size and avoid 32-bit bit-mask
+// overflow; the UI also prevents adding creators beyond this supported limit.
+export function optimize(creators:Creator[],budget:number){
+ if(creators.length>MAX_OPTIMIZED_CREATORS) return {creators:[],profit:0,spend:0,tooMany:true as const};
+ let bestMask=0,bestProfit=0,bestSpend=0;
+ for(let mask=1;mask<2**creators.length;mask++){
+  let spend=0,total=0;
+  for(let i=0;i<creators.length;i++) if((mask & (2**i))!==0){spend+=creators[i].fee;total+=profit(creators[i]);}
+  if(spend<=budget&&total>bestProfit){bestMask=mask;bestProfit=total;bestSpend=spend;}
+ }
+ return {creators:creators.filter((_,i)=>(bestMask & (2**i))!==0),profit:bestProfit,spend:bestSpend,tooMany:false as const};
+}
 
 // Best-profit combination within budget, with a minimum/maximum number of creators. Returns null when no combination fits.
 export function optimizeRange(creators:Creator[],budget:number,min:number,max:number){
  let best:{mask:number;profit:number;spend:number}|null=null;
- for(let mask=1;mask<(1<<creators.length);mask++){let n=0,spend=0,total=0;for(let i=0;i<creators.length;i++)if(mask&(1<<i)){n++;spend+=creators[i].fee;total+=profit(creators[i]);}
+ if(creators.length>MAX_OPTIMIZED_CREATORS)return null;
+ for(let mask=1;mask<2**creators.length;mask++){let n=0,spend=0,total=0;for(let i=0;i<creators.length;i++)if((mask & (2**i))!==0){n++;spend+=creators[i].fee;total+=profit(creators[i]);}
   if(n<min||n>max||spend>budget)continue;if(!best||total>best.profit)best={mask,profit:total,spend};}
- return best?{creators:creators.filter((_,i)=>best!.mask&(1<<i)),profit:best.profit,spend:best.spend}:null;
+ return best?{creators:creators.filter((_,i)=>(best!.mask & (2**i))!==0),profit:best.profit,spend:best.spend}:null;
 }

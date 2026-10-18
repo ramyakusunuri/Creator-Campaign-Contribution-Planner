@@ -1,26 +1,29 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { initialCreators, categories, profit, optimizeRange, DEFAULT_BUDGET, BUDGET_KEY } from "../../lib/creators";
+import { profit, optimizeRange, DEFAULT_BUDGET } from "../../lib/creators";
+import { useCreators } from "../../lib/useCreators";
+import { loadBudget, saveBudget } from "../../lib/store";
 import { money, shortMoney } from "../../lib/format";
 
 type SortBy = "profit" | "cost";
-const MAX_CREATORS = initialCreators.length;
-const toCount = (v: string) => Math.min(MAX_CREATORS, Math.max(0, Math.floor(Number(v) || 0)));
 
 export default function Calculator(){
+ const creators=useCreators();const MAX_CREATORS=creators.length;
+ const toCount=(v:string)=>Math.min(MAX_CREATORS,Math.max(0,Math.floor(Number(v)||0)));
+ const categories=useMemo(()=>Array.from(new Set(creators.map(c=>c.category))),[creators]);
  const [budget,setBudget]=useState(DEFAULT_BUDGET);
  const [min,setMin]=useState(1);
  const [max,setMax]=useState(MAX_CREATORS);
  const [category,setCategory]=useState("All");
  const [sortBy,setSortBy]=useState<SortBy>("profit");
- useEffect(()=>{try{const v=Number(localStorage.getItem(BUDGET_KEY));if(v>0)setBudget(v);}catch{}},[]);
- const changeBudget=(v:number)=>{setBudget(v);try{localStorage.setItem(BUDGET_KEY,String(v));}catch{}};
+ useEffect(()=>{loadBudget().then(v=>{if(v)setBudget(v);});},[]);
+ const changeBudget=(v:number)=>{setBudget(v);saveBudget(v);};
  // Keep min <= max: raising min past max lifts max; lowering max below min lowers min.
  const changeMin=(v:number)=>{setMin(v);if(v>max)setMax(v);};
  const changeMax=(v:number)=>{setMax(v);if(v<min)setMin(v);};
 
- const eligible=useMemo(()=>initialCreators.filter(c=>category==="All"||c.category===category),[category]);
+ const eligible=useMemo(()=>creators.filter(c=>category==="All"||c.category===category),[creators,category]);
  const rec=useMemo(()=>optimizeRange(eligible,budget,Math.max(1,min),max),[eligible,budget,min,max]);
  // List runs from highest to lowest on the chosen measure.
  const list=useMemo(()=>rec?[...rec.creators].sort((a,b)=>sortBy==="profit"?profit(b)-profit(a):b.fee-a.fee):[],[rec,sortBy]);

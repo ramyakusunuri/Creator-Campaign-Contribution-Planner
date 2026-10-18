@@ -4,9 +4,8 @@ import Link from "next/link";
 import type { FoundCreator, Platform } from "../../lib/finder/types";
 import { NICHES } from "../../lib/finder/niche";
 import { compact } from "../../lib/format";
+import { loadShortlist, addShortlist, removeShortlist } from "../../lib/store";
 
-const SHORTLIST_KEY = "finder-shortlist-v1";
-const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // drop stored platform data after 30 days
 const idOf = (c: FoundCreator) => `${c.platform}:${c.username.toLowerCase()}`;
 const followersText = (n: number | null) => (n === null ? "Hidden" : compact(n));
 
@@ -24,14 +23,12 @@ export default function Finder() {
   const [niche, setNiche] = useState("All");
   const [shortlist, setShortlist] = useState<FoundCreator[]>([]);
 
-  useEffect(() => {
-    try {
-      const saved: FoundCreator[] = JSON.parse(localStorage.getItem(SHORTLIST_KEY) ?? "[]");
-      setShortlist(saved.filter(c => Date.now() - new Date(c.fetchedAt).getTime() < MAX_AGE_MS));
-    } catch {}
-  }, []);
-  const saveShortlist = (next: FoundCreator[]) => { setShortlist(next); try { localStorage.setItem(SHORTLIST_KEY, JSON.stringify(next)); } catch {} };
-  const toggle = (c: FoundCreator) => saveShortlist(shortlist.some(s => idOf(s) === idOf(c)) ? shortlist.filter(s => idOf(s) !== idOf(c)) : [...shortlist, c]);
+  useEffect(() => { loadShortlist().then(setShortlist); }, []);
+  const toggle = (c: FoundCreator) => {
+    const on = shortlist.some(s => idOf(s) === idOf(c));
+    setShortlist(on ? shortlist.filter(s => idOf(s) !== idOf(c)) : [...shortlist, c]);
+    if (on) removeShortlist(c); else addShortlist(c);
+  };
 
   async function run() {
     setLoading(true); setError(""); setFailed([]);
@@ -74,7 +71,7 @@ export default function Finder() {
     </section>}
 
     <section className={card}>
-      <div className="flex items-baseline justify-between"><h2 className="text-lg font-bold">Shortlist</h2><span className="text-xs text-slate-500">Saved in this browser · entries expire after 30 days</span></div>
+      <div className="flex items-baseline justify-between"><h2 className="text-lg font-bold">Shortlist</h2><span className="text-xs text-slate-500">Saved to your account · entries expire after 30 days</span></div>
       {shortlist.length === 0 ? <p className="mt-3 text-sm text-slate-500">Nothing yet. Add creators from the results above.</p> : <ul className="mt-3 divide-y divide-slate-100">{[...shortlist].sort((a, b) => (b.followers ?? 0) - (a.followers ?? 0)).map(c => <li key={idOf(c)} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><div><a href={c.profileUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-700 hover:underline">{c.username}</a><span className="ml-2 text-xs capitalize text-slate-500">{c.platform} · {c.niche}</span></div><div className="flex items-center gap-4"><span className="font-semibold">{followersText(c.followers)}</span><button onClick={() => toggle(c)} className="text-xs font-semibold text-rose-600 hover:underline">Remove</button></div></li>)}</ul>}
     </section>
   </div></main>;

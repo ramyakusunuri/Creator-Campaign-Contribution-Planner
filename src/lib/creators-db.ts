@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import seed from "../data/creator_personas_seed.json";
 import { initialCreators, type Creator } from "./creators";
 import { getSupabase } from "./supabase/client";
@@ -53,7 +53,7 @@ export async function fetchPersona(slug: string): Promise<PersonaLite | null> {
       if (!error && data) return { id: data.slug, name: data.name, platform_followers: data.platform_followers ?? {} };
       if (!error) return null; // reachable, and no such creator
     }
-  } catch {}
+  } catch { }
   const p = seed.find(x => x.id === slug);
-  return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers as Record<string, number> } : null;
+  return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers as unknown as Record<string, number> } : null;
 }

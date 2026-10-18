@@ -68,7 +68,11 @@ export async function fetchPersona(slug: string): Promise<PersonaLite | null> {
   } catch {}
   const p = seed.find(x => x.id === slug);
 <<<<<<< HEAD
+<<<<<<< HEAD
   return p ? { id: p.id, name: p.name, platform_followers: toFollowerMap(p.platform_followers) } : null;
+=======
+  return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers as Record<string, number> } : null;
+>>>>>>> d200ce53bf2ee648b98553d051910e9296c15d9a
 =======
   return p ? { id: p.id, name: p.name, platform_followers: p.platform_followers as Record<string, number> } : null;
 >>>>>>> d200ce53bf2ee648b98553d051910e9296c15d9a

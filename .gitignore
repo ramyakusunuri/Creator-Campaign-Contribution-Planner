@@ -2,10 +2,13 @@ node_modules
 .next
 .env*.local
 <<<<<<< HEAD
+<<<<<<< HEAD
 *.tsbuildinfo
 next-env.d.ts
 .vercel
 =======
+=======
+>>>>>>> d200ce53bf2ee648b98553d051910e9296c15d9a
 .env
 **/.env
 *.db
@@ -14,4 +17,7 @@ next-env.d.ts
 node_modules/
 .next/
 powershell.cmd
+<<<<<<< HEAD
+>>>>>>> d200ce53bf2ee648b98553d051910e9296c15d9a
+=======
 >>>>>>> d200ce53bf2ee648b98553d051910e9296c15d9a

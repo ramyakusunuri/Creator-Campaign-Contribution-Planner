@@ -47,3 +47,12 @@ Notes: anonymous data lives with that browser's session (clearing site data lose
 - **Orders are not yet connected to live order records in the UI**: the profile currently generates illustrative sample orders. The database `orders` table is present but needs an order-entry/import flow before those numbers can be treated as real.
 - Exact combination optimization supports at most 20 influencers because exhaustive subset search grows exponentially. The form blocks adding beyond 20.
 - Apply `supabase/migrations/20261018010000_creator_management.sql` after the initial migration and seed SQL. If you already ran the initial migration, run this new migration in the SQL Editor before using Add/Remove.
+
+## Presentation demo: Influencer Finder and profile graphs
+
+- Open `/finder` to see 15 fictional YouTube demo creators and 15 fictional Instagram demo creators without needing API keys.
+- Switch platform tabs to browse each platform's 15 sample profiles. Use **Load presentation demo** to restore demo data after trying live API lookup.
+- Select **View profile** beside any demo creator to open their individualized six-month sales/revenue/net-profit graph and explanation.
+- Existing `/influencer/[id]` creator profiles also include a personalized performance forecast.
+- Demo handles, audience counts, campaign fees, orders, and forecasts are illustrative sample values only. They are not verified real creator accounts or actual results.
+- Live API lookup still requires valid provider credentials configured in `.env.local`.

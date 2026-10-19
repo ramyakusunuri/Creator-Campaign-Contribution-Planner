@@ -1,0 +1,86 @@
+[
+  {
+    "order_id": "ORD-IN-1792319443392",
+    "customer_id": "CUST-Ananya-Sharma",
+    "creator_id": "creator_001",
+    "creator_name": "Aarav Mehta",
+    "promo_code": "AARAV10",
+    "discount_percent": 25,
+    "discount_inr": 375,
+    "total_inr": 1258,
+    "items": [
+      {
+        "product_id": "PRD-1",
+        "name": "Performance Athletic Track Pants",
+        "unit_price_inr": 1499,
+        "quantity": 1,
+        "line_discount_inr": 375
+      }
+    ],
+    "status": "Delivered",
+    "placed_at": "2026-10-18T10:30:43.473Z"
+  },
+  {
+    "order_id": "ORD-IN-1792319410689",
+    "customer_id": "CUST-Ananya-Sharma",
+    "creator_id": "creator_001",
+    "creator_name": "Aarav Mehta",
+    "promo_code": "AARAV10",
+    "discount_percent": 25,
+    "discount_inr": 375,
+    "total_inr": 1258,
+    "items": [
+      {
+        "product_id": "PRD-1",
+        "name": "Performance Athletic Track Pants",
+        "unit_price_inr": 1499,
+        "quantity": 1,
+        "line_discount_inr": 375
+      }
+    ],
+    "status": "Delivered",
+    "placed_at": "2026-10-18T10:30:10.763Z"
+  },
+  {
+    "order_id": "ORD-IN-DEMO-02",
+    "customer_id": "CUST-Ananya-Sharma",
+    "creator_id": "creator_001",
+    "creator_name": "Aarav Mehta",
+    "promo_code": "AARAV10",
+    "discount_percent": 25,
+    "discount_inr": 375,
+    "total_inr": 1258,
+    "items": [
+      {
+        "product_id": "PRD-1",
+        "name": "Performance Athletic Track Pants",
+        "unit_price_inr": 1499,
+        "quantity": 1,
+        "line_discount_inr": 375
+      }
+    ],
+    "status": "Delivered",
+    "placed_at": "2026-10-18T10:29:33.893Z"
+  },
+  {
+    "order_id": "ORD-IN-DEMO-01",
+    "customer_id": "CUST-Ananya-Sharma",
+    "creator_id": "creator_001",
+    "creator_name": "Aarav Mehta",
+    "promo_code": "AARAV10",
+    "discount_percent": 25,
+    "discount_inr": 375,
+    "total_inr": 1258,
+    "items": [
+      {
+        "product_id": "PRD-1",
+        "name": "Performance Athletic Track Pants",
+        "unit_price_inr": 1499,
+        "quantity": 1,
+        "line_discount_inr": 375
+      }
+    ],
+    "status": "Delivered",
+    "placed_at": "2026-10-18T10:29:20.097Z"
+  }
+]

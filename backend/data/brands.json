@@ -1,0 +1,28 @@
+{
+  "_comment": "Synthetic brand data for C24 promo tracking prototype",
+  "synthetic": true,
+  "brands": [
+    {
+      "brand_id": "B1",
+      "name": "Demo Apparel",
+      "category": "apparel",
+      "rivals": ["B2"],
+      "api_key": "demo-key-b1",
+      "api_key_note": "demo only",
+      "report_key": "demo-report-key-b1",
+      "report_keys": ["demo-report-key-b1"],
+      "report_key_note": "demo only"
+    },
+    {
+      "brand_id": "B2",
+      "name": "Demo Apparel Rival",
+      "category": "apparel",
+      "rivals": ["B1"],
+      "api_key": "demo-key-b2",
+      "api_key_note": "demo only",
+      "report_key": "demo-report-key-b2",
+      "report_keys": ["demo-report-key-b2"],
+      "report_key_note": "demo only"
+    }
+  ]
+}

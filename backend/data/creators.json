@@ -1,0 +1,260 @@
+{
+  "_comment": "Synthetic creator data for C24 promo tracking prototype",
+  "synthetic": true,
+  "creators": [
+    {
+      "creator_id": "CR1",
+      "name": "Aarav Sharma",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR2",
+      "name": "Diya Patel",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR3",
+      "name": "Rohan Mehta",
+      "relationships": [
+        "B2"
+      ],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR4",
+      "name": "Ananya Iyer",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR5",
+      "name": "Kabir Verma",
+      "relationships": [],
+      "excluded": true,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "CR6",
+      "name": "Pooja Nair",
+      "relationships": null,
+      "excluded": false,
+      "fee_inr": null
+    },
+    {
+      "creator_id": "creator_001",
+      "name": "Aarav Mehta",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 18000
+    },
+    {
+      "creator_id": "creator_002",
+      "name": "Diya Sharma",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 26000
+    },
+    {
+      "creator_id": "creator_003",
+      "name": "Kabir Reddy",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 15000
+    },
+    {
+      "creator_id": "creator_004",
+      "name": "Ananya Iyer",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 22000
+    },
+    {
+      "creator_id": "creator_005",
+      "name": "Rohan Verma",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 45000
+    },
+    {
+      "creator_id": "creator_006",
+      "name": "Meera Nair",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 12000
+    },
+    {
+      "creator_id": "creator_007",
+      "name": "Ishaan Gupta",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 32000
+    },
+    {
+      "creator_id": "creator_008",
+      "name": "Sana Khan",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 14000
+    },
+    {
+      "creator_id": "creator_009",
+      "name": "Vikram Das",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 19000
+    },
+    {
+      "creator_id": "creator_010",
+      "name": "Priya Joseph",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 10000
+    },
+    {
+      "creator_id": "creator_011",
+      "name": "Arjun Patel",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 28000
+    },
+    {
+      "creator_id": "creator_012",
+      "name": "Tara Bose",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 8000
+    },
+    {
+      "creator_id": "creator_013",
+      "name": "Neel Joshi",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 16000
+    },
+    {
+      "creator_id": "creator_014",
+      "name": "Zoya Mirza",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 9000
+    },
+    {
+      "creator_id": "creator_015",
+      "name": "Aditya Kulkarni",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 17000
+    },
+    {
+      "creator_id": "creator_016",
+      "name": "Kavya Rao",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 20000
+    },
+    {
+      "creator_id": "creator_017",
+      "name": "Dev Malhotra",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 50000
+    },
+    {
+      "creator_id": "creator_018",
+      "name": "Nisha Fernandes",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 13000
+    },
+    {
+      "creator_id": "creator_019",
+      "name": "Rahul Sen",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 24000
+    },
+    {
+      "creator_id": "creator_020",
+      "name": "Pooja Menon",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 16000
+    },
+    {
+      "creator_id": "creator_021",
+      "name": "Siddharth Jain",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 14000
+    },
+    {
+      "creator_id": "creator_022",
+      "name": "Farah Ali",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 30000
+    },
+    {
+      "creator_id": "creator_023",
+      "name": "Manav Shah",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 10000
+    },
+    {
+      "creator_id": "creator_024",
+      "name": "Leena Thomas",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 7000
+    },
+    {
+      "creator_id": "creator_025",
+      "name": "Yash Thakur",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 38000
+    },
+    {
+      "creator_id": "creator_026",
+      "name": "Ritika Banerjee",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 15000
+    },
+    {
+      "creator_id": "creator_027",
+      "name": "Om Prakash",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 19000
+    },
+    {
+      "creator_id": "creator_028",
+      "name": "Simran Kaur",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 25000
+    },
+    {
+      "creator_id": "creator_029",
+      "name": "Kiran Lakshmi",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 9000
+    },
+    {
+      "creator_id": "creator_030",
+      "name": "Ayesha Rahman",
+      "relationships": [],
+      "excluded": false,
+      "fee_inr": 12500
+    }
+  ]
+}

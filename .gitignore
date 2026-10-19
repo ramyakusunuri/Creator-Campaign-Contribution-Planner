@@ -9,3 +9,4 @@ node_modules
 node_modules/
 .next/
 powershell.cmd
+.vercel

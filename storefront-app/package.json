@@ -1,0 +1,11 @@
+{
+  "name": "storefront-app",
+  "version": "1.0.0",
+  "description": "Atelier 24 Luxury E-Commerce Storefront with C24 Promo Integration Proxy",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}

@@ -1,0 +1,1169 @@
+[
+  {
+    "id": "creator_001",
+    "name": "Aarav Mehta",
+    "handle": "@aaravframes",
+    "niche": "Photography & Travel",
+    "location": "Mumbai, Maharashtra",
+    "followers": 48200,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "18-34",
+    "content_style": [
+      "cinematic reels",
+      "travel guides",
+      "photo carousels"
+    ],
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "estimated_rate_inr": 18000,
+    "collaboration_types": [
+      "hotel stays",
+      "travel gear",
+      "tourism campaigns"
+    ],
+    "bio": "Cinematic city escapes, practical travel guides, and photography tips.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 1800,
+    "buys": 90,
+    "clicks_to_buys_ratio": "1800:90",
+    "platform_followers": {
+      "Instagram": 31300,
+      "YouTube": 16900
+    }
+  },
+  {
+    "id": "creator_002",
+    "name": "Diya Sharma",
+    "handle": "@diyabeautyedit",
+    "niche": "Beauty & Skincare",
+    "location": "Delhi, India",
+    "followers": 73500,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube Shorts"
+    ],
+    "audience_age": "18-30",
+    "content_style": [
+      "GRWM",
+      "product tests",
+      "skincare routines"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 26000,
+    "collaboration_types": [
+      "skincare launches",
+      "makeup tutorials",
+      "beauty retail"
+    ],
+    "bio": "Honest product tests and easy routines for everyday beauty.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2400,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2400:100",
+    "platform_followers": {
+      "Instagram": 47800,
+      "YouTube Shorts": 25700
+    }
+  },
+  {
+    "id": "creator_003",
+    "name": "Kabir Reddy",
+    "handle": "@kabirfitlab",
+    "niche": "Fitness & Wellness",
+    "location": "Hyderabad, Telangana",
+    "followers": 38600,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "18-35",
+    "content_style": [
+      "workout demos",
+      "form checks",
+      "meal prep"
+    ],
+    "languages": [
+      "English",
+      "Telugu",
+      "Hindi"
+    ],
+    "estimated_rate_inr": 15000,
+    "collaboration_types": [
+      "fitness apparel",
+      "gym equipment",
+      "healthy food"
+    ],
+    "bio": "Beginner-friendly strength training and sustainable fitness habits.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3100,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3100:100",
+    "platform_followers": {
+      "Instagram": 25100,
+      "YouTube": 13500
+    }
+  },
+  {
+    "id": "creator_004",
+    "name": "Ananya Iyer",
+    "handle": "@ananyaeats",
+    "niche": "Food & Home Cooking",
+    "location": "Bengaluru, Karnataka",
+    "followers": 62400,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube Shorts"
+    ],
+    "audience_age": "21-40",
+    "content_style": [
+      "quick recipes",
+      "local food finds",
+      "kitchen hacks"
+    ],
+    "languages": [
+      "English",
+      "Kannada",
+      "Tamil"
+    ],
+    "estimated_rate_inr": 22000,
+    "collaboration_types": [
+      "food products",
+      "restaurants",
+      "kitchen appliances"
+    ],
+    "bio": "Quick recipes, regional flavours, and honest neighbourhood food reviews.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2200,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2200:100",
+    "platform_followers": {
+      "Instagram": 40600,
+      "YouTube Shorts": 21800
+    }
+  },
+  {
+    "id": "creator_005",
+    "name": "Rohan Verma",
+    "handle": "@rohanbytes",
+    "niche": "Tech & Gadgets",
+    "location": "Pune, Maharashtra",
+    "followers": 112000,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "Instagram"
+    ],
+    "audience_age": "18-34",
+    "content_style": [
+      "reviews",
+      "comparison videos",
+      "setup tours"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 45000,
+    "collaboration_types": [
+      "consumer electronics",
+      "apps",
+      "accessories"
+    ],
+    "bio": "Clear gadget reviews and practical buying advice without the jargon.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2700,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2700:100",
+    "platform_followers": {
+      "YouTube": 72800,
+      "Instagram": 39200
+    }
+  },
+  {
+    "id": "creator_006",
+    "name": "Meera Nair",
+    "handle": "@meeraminimal",
+    "niche": "Fashion & Minimal Style",
+    "location": "Kochi, Kerala",
+    "followers": 29800,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "Pinterest"
+    ],
+    "audience_age": "20-35",
+    "content_style": [
+      "capsule wardrobes",
+      "outfit repeats",
+      "styling reels"
+    ],
+    "languages": [
+      "Malayalam",
+      "English"
+    ],
+    "estimated_rate_inr": 12000,
+    "collaboration_types": [
+      "apparel",
+      "bags",
+      "sustainable fashion"
+    ],
+    "bio": "Repeatable outfits, mindful shopping, and accessible personal style.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3500,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3500:100",
+    "platform_followers": {
+      "Instagram": 19400,
+      "Pinterest": 10400
+    }
+  },
+  {
+    "id": "creator_007",
+    "name": "Ishaan Gupta",
+    "handle": "@ishaanplays",
+    "niche": "Gaming & Esports",
+    "location": "Jaipur, Rajasthan",
+    "followers": 89500,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "Instagram",
+      "Discord"
+    ],
+    "audience_age": "16-28",
+    "content_style": [
+      "gameplay highlights",
+      "streams",
+      "beginner tips"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 32000,
+    "collaboration_types": [
+      "gaming peripherals",
+      "games",
+      "energy-free snack brands"
+    ],
+    "bio": "Competitive gameplay, funny highlights, and community challenges.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2000,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2000:100",
+    "platform_followers": {
+      "YouTube": 49200,
+      "Instagram": 26800,
+      "Discord": 13500
+    }
+  },
+  {
+    "id": "creator_008",
+    "name": "Sana Khan",
+    "handle": "@sanastudies",
+    "niche": "Education & Study Skills",
+    "location": "Lucknow, Uttar Pradesh",
+    "followers": 41700,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "16-26",
+    "content_style": [
+      "study routines",
+      "exam tips",
+      "resource explainers"
+    ],
+    "languages": [
+      "Hindi",
+      "English",
+      "Urdu"
+    ],
+    "estimated_rate_inr": 14000,
+    "collaboration_types": [
+      "stationery",
+      "learning apps",
+      "online courses"
+    ],
+    "bio": "Realistic study systems and exam prep advice for students.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 1600,
+    "buys": 100,
+    "clicks_to_buys_ratio": "1600:100",
+    "platform_followers": {
+      "Instagram": 27100,
+      "YouTube": 14600
+    }
+  },
+  {
+    "id": "creator_009",
+    "name": "Vikram Das",
+    "handle": "@vikramwanders",
+    "niche": "Budget Travel",
+    "location": "Kolkata, West Bengal",
+    "followers": 55300,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "20-38",
+    "content_style": [
+      "budget itineraries",
+      "train journeys",
+      "travel cost breakdowns"
+    ],
+    "languages": [
+      "Bengali",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 19000,
+    "collaboration_types": [
+      "travel booking",
+      "backpacks",
+      "local tourism"
+    ],
+    "bio": "Detailed itineraries and realistic budgets for independent travellers.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2900,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2900:100",
+    "platform_followers": {
+      "Instagram": 35900,
+      "YouTube": 19400
+    }
+  },
+  {
+    "id": "creator_010",
+    "name": "Priya Joseph",
+    "handle": "@plantwithpriya",
+    "niche": "Plants & Sustainable Living",
+    "location": "Chennai, Tamil Nadu",
+    "followers": 26400,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "Pinterest"
+    ],
+    "audience_age": "22-40",
+    "content_style": [
+      "plant care",
+      "small-space gardening",
+      "low-waste swaps"
+    ],
+    "languages": [
+      "Tamil",
+      "English"
+    ],
+    "estimated_rate_inr": 10000,
+    "collaboration_types": [
+      "gardening supplies",
+      "home goods",
+      "eco-friendly products"
+    ],
+    "bio": "Low-maintenance plants and small sustainable changes for apartment living.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3300,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3300:100",
+    "platform_followers": {
+      "Instagram": 17200,
+      "Pinterest": 9200
+    }
+  },
+  {
+    "id": "creator_011",
+    "name": "Arjun Patel",
+    "handle": "@arjunmoneywise",
+    "niche": "Personal Finance Education",
+    "location": "Ahmedabad, Gujarat",
+    "followers": 67800,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "Instagram"
+    ],
+    "audience_age": "21-40",
+    "content_style": [
+      "money explainers",
+      "budget templates",
+      "financial basics"
+    ],
+    "languages": [
+      "Gujarati",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 28000,
+    "collaboration_types": [
+      "budgeting apps",
+      "education platforms",
+      "productivity tools"
+    ],
+    "bio": "Plain-language money basics and budgeting habits for young adults.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2500,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2500:100",
+    "platform_followers": {
+      "YouTube": 44100,
+      "Instagram": 23700
+    }
+  },
+  {
+    "id": "creator_012",
+    "name": "Tara Bose",
+    "handle": "@tarareadsalot",
+    "niche": "Books & Literature",
+    "location": "Kolkata, West Bengal",
+    "followers": 19300,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "18-34",
+    "content_style": [
+      "book reviews",
+      "reading vlogs",
+      "monthly wrap-ups"
+    ],
+    "languages": [
+      "English",
+      "Bengali"
+    ],
+    "estimated_rate_inr": 8000,
+    "collaboration_types": [
+      "publishers",
+      "bookstores",
+      "reading accessories"
+    ],
+    "bio": "Thoughtful reviews, reading lists, and cosy book-community content.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 1900,
+    "buys": 100,
+    "clicks_to_buys_ratio": "1900:100",
+    "platform_followers": {
+      "Instagram": 12500,
+      "YouTube": 6800
+    }
+  },
+  {
+    "id": "creator_013",
+    "name": "Neel Joshi",
+    "handle": "@neelbuilds",
+    "niche": "Coding & Developer Life",
+    "location": "Indore, Madhya Pradesh",
+    "followers": 35800,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "LinkedIn",
+      "Instagram"
+    ],
+    "audience_age": "18-32",
+    "content_style": [
+      "coding tutorials",
+      "project demos",
+      "career tips"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 16000,
+    "collaboration_types": [
+      "developer tools",
+      "coding courses",
+      "laptops"
+    ],
+    "bio": "Build-in-public projects and practical programming tutorials for learners.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2800,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2800:100",
+    "platform_followers": {
+      "YouTube": 19700,
+      "LinkedIn": 10700,
+      "Instagram": 5400
+    }
+  },
+  {
+    "id": "creator_014",
+    "name": "Zoya Mirza",
+    "handle": "@zoyamakesart",
+    "niche": "Art & Illustration",
+    "location": "Srinagar, Jammu and Kashmir",
+    "followers": 22700,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "Pinterest"
+    ],
+    "audience_age": "18-34",
+    "content_style": [
+      "drawing timelapses",
+      "digital art",
+      "process videos"
+    ],
+    "languages": [
+      "Urdu",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 9000,
+    "collaboration_types": [
+      "art supplies",
+      "creative software",
+      "stationery"
+    ],
+    "bio": "Colourful illustration processes and creative prompts for aspiring artists.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3200,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3200:100",
+    "platform_followers": {
+      "Instagram": 14800,
+      "Pinterest": 7900
+    }
+  },
+  {
+    "id": "creator_015",
+    "name": "Aditya Kulkarni",
+    "handle": "@adityaruns",
+    "niche": "Running & Outdoor Fitness",
+    "location": "Mumbai, Maharashtra",
+    "followers": 44600,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "Strava",
+      "YouTube"
+    ],
+    "audience_age": "20-40",
+    "content_style": [
+      "training logs",
+      "race recaps",
+      "gear tests"
+    ],
+    "languages": [
+      "Marathi",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 17000,
+    "collaboration_types": [
+      "running shoes",
+      "sportswear",
+      "race events"
+    ],
+    "bio": "Approachable running plans, race-day lessons, and gear from real training.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2100,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2100:100",
+    "platform_followers": {
+      "Instagram": 24500,
+      "Strava": 13400,
+      "YouTube": 6700
+    }
+  },
+  {
+    "id": "creator_016",
+    "name": "Kavya Rao",
+    "handle": "@kavyahomeedit",
+    "niche": "Home Decor & DIY",
+    "location": "Hyderabad, Telangana",
+    "followers": 51200,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "Pinterest",
+      "YouTube"
+    ],
+    "audience_age": "24-44",
+    "content_style": [
+      "room makeovers",
+      "DIY decor",
+      "small-space ideas"
+    ],
+    "languages": [
+      "Telugu",
+      "English",
+      "Hindi"
+    ],
+    "estimated_rate_inr": 20000,
+    "collaboration_types": [
+      "home decor",
+      "furniture",
+      "storage products"
+    ],
+    "bio": "Budget-friendly room transformations and practical home organisation.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2600,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2600:100",
+    "platform_followers": {
+      "Instagram": 28200,
+      "Pinterest": 15400,
+      "YouTube": 7600
+    }
+  },
+  {
+    "id": "creator_017",
+    "name": "Dev Malhotra",
+    "handle": "@devlaughs",
+    "niche": "Comedy & Sketches",
+    "location": "Chandigarh, India",
+    "followers": 138000,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube Shorts"
+    ],
+    "audience_age": "18-30",
+    "content_style": [
+      "relatable sketches",
+      "character comedy",
+      "duets"
+    ],
+    "languages": [
+      "Hindi",
+      "Punjabi",
+      "English"
+    ],
+    "estimated_rate_inr": 50000,
+    "collaboration_types": [
+      "food delivery",
+      "mobile apps",
+      "youth lifestyle brands"
+    ],
+    "bio": "Relatable everyday comedy and recurring characters with a local twist.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 1700,
+    "buys": 100,
+    "clicks_to_buys_ratio": "1700:100",
+    "platform_followers": {
+      "Instagram": 89700,
+      "YouTube Shorts": 48300
+    }
+  },
+  {
+    "id": "creator_018",
+    "name": "Nisha Fernandes",
+    "handle": "@nishamomnotes",
+    "niche": "Parenting & Family Lifestyle",
+    "location": "Goa, India",
+    "followers": 31900,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "25-42",
+    "content_style": [
+      "parenting routines",
+      "family activities",
+      "product walkthroughs"
+    ],
+    "languages": [
+      "Konkani",
+      "English",
+      "Hindi"
+    ],
+    "estimated_rate_inr": 13000,
+    "collaboration_types": [
+      "children's books",
+      "family travel",
+      "home essentials"
+    ],
+    "bio": "Practical family routines and playful activities for busy parents.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3000,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3000:100",
+    "platform_followers": {
+      "Instagram": 20700,
+      "YouTube": 11200
+    }
+  },
+  {
+    "id": "creator_019",
+    "name": "Rahul Sen",
+    "handle": "@rahulsoundroom",
+    "niche": "Music & Audio",
+    "location": "Bengaluru, Karnataka",
+    "followers": 58200,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "Instagram"
+    ],
+    "audience_age": "18-34",
+    "content_style": [
+      "music breakdowns",
+      "cover performances",
+      "audio gear demos"
+    ],
+    "languages": [
+      "English",
+      "Hindi",
+      "Bengali"
+    ],
+    "estimated_rate_inr": 24000,
+    "collaboration_types": [
+      "headphones",
+      "music apps",
+      "instruments"
+    ],
+    "bio": "Music discovery and accessible explanations of sound and recording gear.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2300,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2300:100",
+    "platform_followers": {
+      "YouTube": 37800,
+      "Instagram": 20400
+    }
+  },
+  {
+    "id": "creator_020",
+    "name": "Pooja Menon",
+    "handle": "@poojawellbeing",
+    "niche": "Yoga & Mindfulness",
+    "location": "Thiruvananthapuram, Kerala",
+    "followers": 40700,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "22-42",
+    "content_style": [
+      "gentle yoga flows",
+      "breathing exercises",
+      "wellness routines"
+    ],
+    "languages": [
+      "Malayalam",
+      "English"
+    ],
+    "estimated_rate_inr": 16000,
+    "collaboration_types": [
+      "yoga mats",
+      "comfortable apparel",
+      "wellness journals"
+    ],
+    "bio": "Accessible movement and mindfulness routines for everyday life.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3400,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3400:100",
+    "platform_followers": {
+      "Instagram": 26500,
+      "YouTube": 14200
+    }
+  },
+  {
+    "id": "creator_021",
+    "name": "Siddharth Jain",
+    "handle": "@sidstylemen",
+    "niche": "Men's Grooming & Style",
+    "location": "Gurugram, Haryana",
+    "followers": 34600,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube Shorts"
+    ],
+    "audience_age": "18-35",
+    "content_style": [
+      "grooming routines",
+      "outfit guides",
+      "fragrance reviews"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 14000,
+    "collaboration_types": [
+      "grooming products",
+      "menswear",
+      "fragrance"
+    ],
+    "bio": "Straightforward grooming and style tips at accessible price points.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2700,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2700:100",
+    "platform_followers": {
+      "Instagram": 22500,
+      "YouTube Shorts": 12100
+    }
+  },
+  {
+    "id": "creator_022",
+    "name": "Farah Ali",
+    "handle": "@farahfooddiary",
+    "niche": "Regional Food & Street Food",
+    "location": "Hyderabad, Telangana",
+    "followers": 84900,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "18-40",
+    "content_style": [
+      "street food tours",
+      "regional dishes",
+      "vendor stories"
+    ],
+    "languages": [
+      "Telugu",
+      "Hindi",
+      "English",
+      "Urdu"
+    ],
+    "estimated_rate_inr": 30000,
+    "collaboration_types": [
+      "restaurants",
+      "food festivals",
+      "local delivery services"
+    ],
+    "bio": "Local food discoveries, vendor stories, and regional favourites.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2000,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2000:100",
+    "platform_followers": {
+      "Instagram": 55200,
+      "YouTube": 29700
+    }
+  },
+  {
+    "id": "creator_023",
+    "name": "Manav Shah",
+    "handle": "@manavoncampus",
+    "niche": "Student Life & Career",
+    "location": "Surat, Gujarat",
+    "followers": 28100,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "LinkedIn"
+    ],
+    "audience_age": "17-26",
+    "content_style": [
+      "college skits",
+      "internship tips",
+      "campus guides"
+    ],
+    "languages": [
+      "Gujarati",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 10000,
+    "collaboration_types": [
+      "student apps",
+      "edtech",
+      "career platforms"
+    ],
+    "bio": "College-life humour plus practical internship and early-career advice.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3600,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3600:100",
+    "platform_followers": {
+      "Instagram": 18300,
+      "LinkedIn": 9800
+    }
+  },
+  {
+    "id": "creator_024",
+    "name": "Leena Thomas",
+    "handle": "@leenasews",
+    "niche": "Crafts, Sewing & DIY Fashion",
+    "location": "Coimbatore, Tamil Nadu",
+    "followers": 16800,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube"
+    ],
+    "audience_age": "20-45",
+    "content_style": [
+      "sewing tutorials",
+      "upcycling",
+      "craft projects"
+    ],
+    "languages": [
+      "Tamil",
+      "English"
+    ],
+    "estimated_rate_inr": 7000,
+    "collaboration_types": [
+      "fabric stores",
+      "craft supplies",
+      "sewing machines"
+    ],
+    "bio": "Beginner-friendly sewing projects and creative ways to reuse clothing.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2400,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2400:100",
+    "platform_followers": {
+      "Instagram": 10900,
+      "YouTube": 5900
+    }
+  },
+  {
+    "id": "creator_025",
+    "name": "Yash Thakur",
+    "handle": "@yashautogear",
+    "niche": "Automotive & Motorcycles",
+    "location": "Nagpur, Maharashtra",
+    "followers": 97200,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "Instagram"
+    ],
+    "audience_age": "20-40",
+    "content_style": [
+      "vehicle reviews",
+      "maintenance tips",
+      "road-trip videos"
+    ],
+    "languages": [
+      "Hindi",
+      "Marathi",
+      "English"
+    ],
+    "estimated_rate_inr": 38000,
+    "collaboration_types": [
+      "riding gear",
+      "vehicle accessories",
+      "automotive services"
+    ],
+    "bio": "Practical vehicle ownership advice, reviews, and safe riding content.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2900,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2900:100",
+    "platform_followers": {
+      "YouTube": 63200,
+      "Instagram": 34000
+    }
+  },
+  {
+    "id": "creator_026",
+    "name": "Ritika Banerjee",
+    "handle": "@ritikapaws",
+    "niche": "Pets & Animal Care",
+    "location": "Bhubaneswar, Odisha",
+    "followers": 37500,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube Shorts"
+    ],
+    "audience_age": "18-38",
+    "content_style": [
+      "pet routines",
+      "training basics",
+      "rescue stories"
+    ],
+    "languages": [
+      "Odia",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 15000,
+    "collaboration_types": [
+      "pet food",
+      "pet accessories",
+      "animal welfare campaigns"
+    ],
+    "bio": "Pet-care basics, adoption awareness, and everyday life with rescue animals.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 1800,
+    "buys": 100,
+    "clicks_to_buys_ratio": "1800:100",
+    "platform_followers": {
+      "Instagram": 24400,
+      "YouTube Shorts": 13100
+    }
+  },
+  {
+    "id": "creator_027",
+    "name": "Om Prakash",
+    "handle": "@omexplainscience",
+    "niche": "Science & Experiments",
+    "location": "Patna, Bihar",
+    "followers": 49200,
+    "primary_platform": "YouTube",
+    "platforms": [
+      "YouTube",
+      "Instagram"
+    ],
+    "audience_age": "16-32",
+    "content_style": [
+      "safe demonstrations",
+      "science explainers",
+      "myth-busting"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 19000,
+    "collaboration_types": [
+      "STEM kits",
+      "learning platforms",
+      "educational events"
+    ],
+    "bio": "Simple, safe science demonstrations that make everyday questions interesting.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 3100,
+    "buys": 100,
+    "clicks_to_buys_ratio": "3100:100",
+    "platform_followers": {
+      "YouTube": 32000,
+      "Instagram": 17200
+    }
+  },
+  {
+    "id": "creator_028",
+    "name": "Simran Kaur",
+    "handle": "@simranweddingdiary",
+    "niche": "Weddings & Occasion Style",
+    "location": "Amritsar, Punjab",
+    "followers": 65400,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "Pinterest"
+    ],
+    "audience_age": "20-36",
+    "content_style": [
+      "occasion outfits",
+      "wedding checklists",
+      "event styling"
+    ],
+    "languages": [
+      "Punjabi",
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 25000,
+    "collaboration_types": [
+      "ethnic wear",
+      "jewellery",
+      "beauty services"
+    ],
+    "bio": "Wearable occasion looks and practical planning inspiration for celebrations.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2200,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2200:100",
+    "platform_followers": {
+      "Instagram": 42500,
+      "Pinterest": 22900
+    }
+  },
+  {
+    "id": "creator_029",
+    "name": "Kiran Lakshmi",
+    "handle": "@kiranquickbites",
+    "niche": "Healthy Food & Meal Prep",
+    "location": "Visakhapatnam, Andhra Pradesh",
+    "followers": 23900,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "YouTube Shorts"
+    ],
+    "audience_age": "20-38",
+    "content_style": [
+      "meal prep",
+      "lunchbox ideas",
+      "simple nutrition explainers"
+    ],
+    "languages": [
+      "Telugu",
+      "English"
+    ],
+    "estimated_rate_inr": 9000,
+    "collaboration_types": [
+      "groceries",
+      "meal containers",
+      "kitchen tools"
+    ],
+    "bio": "Simple meal-prep ideas for students and busy working professionals.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 2600,
+    "buys": 100,
+    "clicks_to_buys_ratio": "2600:100",
+    "platform_followers": {
+      "Instagram": 15500,
+      "YouTube Shorts": 8400
+    }
+  },
+  {
+    "id": "creator_030",
+    "name": "Ayesha Rahman",
+    "handle": "@ayeshadigitaldiary",
+    "niche": "Productivity & Digital Tools",
+    "location": "Noida, Uttar Pradesh",
+    "followers": 31400,
+    "primary_platform": "Instagram",
+    "platforms": [
+      "Instagram",
+      "LinkedIn",
+      "YouTube"
+    ],
+    "audience_age": "20-38",
+    "content_style": [
+      "workflow demos",
+      "app tutorials",
+      "desk setup tips"
+    ],
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "estimated_rate_inr": 12500,
+    "collaboration_types": [
+      "productivity apps",
+      "software tools",
+      "desk accessories"
+    ],
+    "bio": "Practical digital workflows and tools for students, freelancers, and teams.",
+    "metrics_note": "Illustrative demo values only; replace with verified campaign tracking data.",
+    "clicks": 1900,
+    "buys": 100,
+    "clicks_to_buys_ratio": "1900:100",
+    "platform_followers": {
+      "Instagram": 17300,
+      "LinkedIn": 9400,
+      "YouTube": 4700
+    }
+  }
+]
